@@ -3,17 +3,19 @@ import { UserService } from '../user/user.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { compare } from 'bcrypt';
+import { JwtService } from '@nestjs/jwt';
+import { AuthJwtPayload } from './types/auth-jwtPayload';
 
 @Injectable()
 export class AuthService {
-    constructor(private readonly userService:UserService){}
+    constructor(private readonly userService:UserService, private jwtService:JwtService){}
 
     async register(registerDto:RegisterDto){
         return await this.userService.create(registerDto);
     }
-    async login(loginDto:LoginDto){
-        const thisUser = this.userService.findByEmail(loginDto.email)
-
+    async login(userId:number){
+        const payload:AuthJwtPayload = {sub:userId};
+        return this.jwtService.sign(payload);
     }
     async validateUser(email:string,password:string){
         const user = await this.userService.findByEmail(email);
