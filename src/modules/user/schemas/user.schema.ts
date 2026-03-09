@@ -22,6 +22,9 @@ export class User {
   @Prop({ default: '' })
   name?: string;
 
+  @Prop({ default: null, select:false })
+  hashedRefreshToken?: string;
+
   @Prop({ default: UserRole.Student, type:String, enum:UserRole })
   role: UserRole;
 

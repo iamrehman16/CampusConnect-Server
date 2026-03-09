@@ -37,10 +37,18 @@ export class UserService {
     return this.userModel.find().exec();
   }
 
-  async findOne(id: string) {
-    const user = await this.userModel.findById(id).exec();
+  async findOne(userId: number) {
+    const user = await this.userModel.findById(userId).exec();
     if (!user) {
-      throw new NotFoundException(`User with id ${id} not found`);
+      throw new NotFoundException(`User with id ${userId} not found`);
+    }
+    return user;
+  }
+
+  async findOneWithHashedRefreshToken(userId: number) {
+    const user = await this.userModel.findById(userId).select("+hashedRefreshToken").exec();
+    if (!user) {
+      throw new NotFoundException(`User with id ${userId} not found`);
     }
     return user;
   }
@@ -55,7 +63,7 @@ export class UserService {
 
 
   
-  async update(id: string, updateUserDto: UpdateUserDto) {
+  async update(id: number, updateUserDto: UpdateUserDto) {
     if (updateUserDto.password) {
       updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
     }
@@ -71,11 +79,15 @@ export class UserService {
     return updatedUser;
   }
 
-  async remove(id: string) {
+  async remove(id: number) {
     const deletedUser = await this.userModel.findByIdAndDelete(id).exec();
     if (!deletedUser) {
       throw new NotFoundException(`User with id ${id} not found`);
     }
     return deletedUser;
+  }
+
+  async updateRefreshToken(userId:number, hashedRefreshToken:string|null){
+    return await this.userModel.findByIdAndUpdate(userId,{hashedRefreshToken:hashedRefreshToken},{new:true});
   }
 }
