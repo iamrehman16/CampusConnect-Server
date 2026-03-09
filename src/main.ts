@@ -11,7 +11,7 @@ async function bootstrap() {
   //setting up cors
   app.enableCors({
     origin:process.env.FRONTEND_URL || "http://localhost:5173",
-    credentails: true,
+    credentials: true,
   })
 
   //global validation pipes
