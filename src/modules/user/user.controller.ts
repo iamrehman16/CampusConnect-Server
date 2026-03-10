@@ -1,41 +1,61 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req } from '@nestjs/common';
 import { UserService } from './user.service';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guards';
-
-@Controller('user')
+import { Role } from '../auth/decorators/role.decorator';
+import { Roles } from './enums/user-role.enum';
+import { AdminUpdateUserDto } from './dto/update-admin-profile.dto';
+import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
+import { RegisterUserDto } from './dto/register-user.dto';
+import { AdminCreateUserDto } from './dto/admin-create-user.dto';
+import { Public } from '../auth/decorators/public.decorator';
+@Controller('users')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
-  @Post()
-  create(@Body() createUserDto: CreateUserDto) {
-    return this.userService.create(createUserDto);
+  // Public registration
+  @Public()
+  @Post('register')
+  register(@Body() dto: RegisterUserDto) {
+    return this.userService.createUser(dto);
   }
 
-  @UseGuards(JwtAuthGuard)
+  // Admin creates user
+  @Role(Roles.ADMIN)
+  @Post()
+  createByAdmin(@Body() dto: AdminCreateUserDto) {
+    return this.userService.createUserByAdmin(dto);
+  }
+
   @Get('profile')
-  getProfile(@Req() req){
+  getProfile(@Req() req) {
     return this.userService.findOne(req.user.id);
   }
 
+  @Patch('profile')
+  updateProfile(@Req() req, @Body() dto: UpdateUserProfileDto) {
+    return this.userService.updateProfile(req.user.id, dto);
+  }
+
+  @Role(Roles.ADMIN)
   @Get()
   findAll() {
     return this.userService.findAll();
   }
 
+  @Role(Roles.ADMIN)
   @Get(':id')
-  findOne(@Param('id') id: number) {
+  findOne(@Param('id') id: string) {
     return this.userService.findOne(id);
   }
 
+  @Role(Roles.ADMIN)
   @Patch(':id')
-  update(@Param('id') id: number, @Body() updateUserDto: UpdateUserDto) {
-    return this.userService.update(id, updateUserDto);
+  update(@Param('id') id: string, @Body() dto: AdminUpdateUserDto) {
+    return this.userService.updateUserByAdmin(id, dto);
   }
 
+  @Role(Roles.ADMIN)
   @Delete(':id')
-  remove(@Param('id') id: number) {
+  remove(@Param('id') id: string) {
     return this.userService.remove(id);
   }
 }

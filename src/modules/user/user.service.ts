@@ -3,41 +3,53 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
+import { AdminUpdateUserDto } from './dto/update-admin-profile.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { User } from './schemas/user.schema';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
+import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
+import { RegisterUserDto } from './dto/register-user.dto';
+import { Roles } from './enums/user-role.enum';
+import { UserStatus } from './enums/user-status.enum';
+import { AdminCreateUserDto } from './dto/admin-create-user.dto';
 
 @Injectable()
 export class UserService {
   constructor(@InjectModel(User.name) private userModel: Model<User>) {}
 
-  async create(createUserDto: CreateUserDto) {
-    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+  async createUser(dto: RegisterUserDto) {
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
 
     const newUser = new this.userModel({
-      ...createUserDto,
-      name: createUserDto.name || createUserDto.email,
+      ...dto,
+      name: dto.name || dto.email,
+      password: hashedPassword,
+      role: Roles.STUDENT,
+      accountStatus: UserStatus.ACTIVE,
+      contributionScore: 0,
+    });
+
+    return newUser.save();
+  }
+
+  async createUserByAdmin(dto: AdminCreateUserDto) {
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
+
+    const newUser = new this.userModel({
+      ...dto,
+      name: dto.name || dto.email,
       password: hashedPassword,
     });
 
-    try {
-      return await newUser.save();
-    } catch (error) {
-      if (error.code === 11000) {
-        throw new ConflictException('User with this email already exists');
-      }
-      throw error;
-    }
+    return newUser.save();
   }
 
   async findAll() {
     return this.userModel.find().exec();
   }
 
-  async findOne(userId: number) {
+  async findOne(userId: string) {
     const user = await this.userModel.findById(userId).exec();
     if (!user) {
       throw new NotFoundException(`User with id ${userId} not found`);
@@ -45,8 +57,11 @@ export class UserService {
     return user;
   }
 
-  async findOneWithHashedRefreshToken(userId: number) {
-    const user = await this.userModel.findById(userId).select("+hashedRefreshToken").exec();
+  async findOneWithHashedRefreshToken(userId: string) {
+    const user = await this.userModel
+      .findById(userId)
+      .select('+hashedRefreshToken')
+      .exec();
     if (!user) {
       throw new NotFoundException(`User with id ${userId} not found`);
     }
@@ -54,22 +69,19 @@ export class UserService {
   }
 
   async findByEmail(email: string) {
-    const user = await this.userModel.findOne({email}).select("+password").exec();
+    const user = await this.userModel
+      .findOne({ email })
+      .select('+password')
+      .exec();
     if (!user) {
       throw new NotFoundException(`User with id ${email} not found`);
     }
     return user;
   }
 
-
-  
-  async update(id: number, updateUserDto: UpdateUserDto) {
-    if (updateUserDto.password) {
-      updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
-    }
-
+  async updateUserByAdmin(id: string, dto: AdminUpdateUserDto) {
     const updatedUser = await this.userModel
-      .findByIdAndUpdate(id, updateUserDto, { new: true })
+      .findByIdAndUpdate(id, dto, { new: true })
       .exec();
 
     if (!updatedUser) {
@@ -79,7 +91,23 @@ export class UserService {
     return updatedUser;
   }
 
-  async remove(id: number) {
+  async updateProfile(userId: string, dto: UpdateUserProfileDto) {
+    if (dto.password) {
+      dto.password = await bcrypt.hash(dto.password, 10);
+    }
+
+    const updatedUser = await this.userModel
+      .findByIdAndUpdate(userId, dto, { new: true })
+      .exec();
+
+    if (!updatedUser) {
+      throw new NotFoundException(`User with id ${userId} not found`);
+    }
+
+    return updatedUser;
+  }
+
+  async remove(id: string) {
     const deletedUser = await this.userModel.findByIdAndDelete(id).exec();
     if (!deletedUser) {
       throw new NotFoundException(`User with id ${id} not found`);
@@ -87,7 +115,11 @@ export class UserService {
     return deletedUser;
   }
 
-  async updateRefreshToken(userId:number, hashedRefreshToken:string|null){
-    return await this.userModel.findByIdAndUpdate(userId,{hashedRefreshToken:hashedRefreshToken},{new:true});
+  async updateRefreshToken(userId: string, hashedRefreshToken: string | null) {
+    return await this.userModel.findByIdAndUpdate(
+      userId,
+      { hashedRefreshToken: hashedRefreshToken },
+      { new: true },
+    );
   }
 }

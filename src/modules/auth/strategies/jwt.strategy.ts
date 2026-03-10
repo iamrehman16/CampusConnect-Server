@@ -4,12 +4,14 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import jwtConfig from '../config/jwt.config';
 import type { ConfigType } from '@nestjs/config';
 import { AuthJwtPayload } from '../types/auth-jwtPayload';
+import { AuthService } from '../auth.service';
 
 @Injectable()
 export class JWTStrategy extends PassportStrategy(Strategy) {
   constructor(
     @Inject(jwtConfig.KEY)
     jwtConfiguration: ConfigType<typeof jwtConfig>,
+    private readonly authService:AuthService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -19,6 +21,8 @@ export class JWTStrategy extends PassportStrategy(Strategy) {
   }
 
   validate(payload: AuthJwtPayload) {
-    return { id: payload.sub };
+    const userId = payload.sub;
+    console.log("LocalStrategy says: ",userId)
+    return this.authService.validateJwtUser(userId);
   }
 }

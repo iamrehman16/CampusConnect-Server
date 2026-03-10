@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
-import { UserRole } from "../enums/user-role.enum";
+import { Roles } from "../enums/user-role.enum";
 import { UserStatus } from "../enums/user-status.enum";
 
 @Schema({
@@ -25,8 +25,8 @@ export class User {
   @Prop({ default: null, select:false })
   hashedRefreshToken?: string;
 
-  @Prop({ default: UserRole.Student, type:String, enum:UserRole })
-  role: UserRole;
+  @Prop({ default: Roles.STUDENT, type:String, enum:Roles })
+  role: Roles;
 
   @Prop()
   academicInfo: string;
@@ -37,7 +37,7 @@ export class User {
   @Prop({ default: 0 })
   contributionScore: number;
 
-  @Prop({ default: UserStatus.Active, enum: UserStatus, type:String })
+  @Prop({ default: UserStatus.ACTIVE, enum: UserStatus, type:String })
   accountStatus: UserStatus;
 }
 

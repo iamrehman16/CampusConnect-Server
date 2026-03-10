@@ -7,6 +7,7 @@ import { AuthJwtPayload } from './types/auth-jwtPayload';
 import refreshJwtConfig from './config/refresh-jwt.config';
 import type { ConfigType } from '@nestjs/config';
 import argon2 from "argon2"
+import { CurrentUser } from './types/current-user';
 
 @Injectable()
 export class AuthService {
@@ -16,10 +17,10 @@ export class AuthService {
         @Inject(refreshJwtConfig.KEY) private readonly refreshtTokenConfig: ConfigType<typeof refreshJwtConfig>
     ){}
 
-    async register(registerDto:RegisterDto){
-        return await this.userService.create(registerDto);
+    async register(dto:RegisterDto){
+        return await this.userService.createUser(dto);
     }
-    async login(userId:number){
+    async login(userId:string){
         const {accessToken,refreshToken} = await this.generateTokens(userId);
         const hashedRefreshToken = await argon2.hash(refreshToken);
         await this.userService.updateRefreshToken(userId,hashedRefreshToken);
@@ -36,9 +37,9 @@ export class AuthService {
         const isPasswordMatch = await compare(password,user.password);
         if(!isPasswordMatch) throw new UnauthorizedException("Invalid Credentials");
 
-        return {id:user._id};
+        return {id:user._id.toString()};
     }
-    async refreshToken(userId:number){
+    async refreshToken(userId:string){
         const {accessToken,refreshToken} = await this.generateTokens(userId);
         const hashedRefreshToken = await argon2.hash(refreshToken);
         await this.userService.updateRefreshToken(userId,hashedRefreshToken);
@@ -51,7 +52,7 @@ export class AuthService {
     }
 
 
-    async generateTokens(userId:number){
+    async generateTokens(userId:string){
         const payload:AuthJwtPayload = {sub:userId};
         const [accessToken,refreshToken] = await Promise.all([
             this.jwtService.signAsync(payload),
@@ -61,7 +62,7 @@ export class AuthService {
         return {accessToken,refreshToken};
     }
 
-    async validateRefreshToken(userId:number,refreshToken:string){
+    async validateRefreshToken(userId:string,refreshToken:string){
         const user = await this.userService.findOneWithHashedRefreshToken(userId);
         if(!user||!user.hashedRefreshToken) throw new UnauthorizedException("Invalid Refresh Token!");
 
@@ -71,7 +72,15 @@ export class AuthService {
         return {id:userId};
     }
 
-    async signout(userId:number){
+    async signout(userId:string){
         await this.userService.updateRefreshToken(userId,null);
     }
+
+
+      async validateJwtUser(userId: string) {
+        const user = await this.userService.findOne(userId);  
+        if(!user) throw new UnauthorizedException("User not found");
+        const currentUser:CurrentUser = {id:user._id.toString(),role:user.role};      
+        return currentUser;
+      }
 }
