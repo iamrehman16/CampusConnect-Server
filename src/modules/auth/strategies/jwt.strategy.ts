@@ -22,7 +22,6 @@ export class JWTStrategy extends PassportStrategy(Strategy) {
 
   validate(payload: AuthJwtPayload) {
     const userId = payload.sub;
-    console.log("LocalStrategy says: ",userId)
     return this.authService.validateJwtUser(userId);
   }
 }

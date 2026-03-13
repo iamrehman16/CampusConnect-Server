@@ -30,7 +30,14 @@ export class UserService {
       contributionScore: 0,
     });
 
-    return newUser.save();
+    try {
+      return await newUser.save();
+    } catch (error: any) {
+      if (error.code === 11000) {
+        throw new ConflictException('User with this email already exists');
+      }
+      throw error;
+    }
   }
 
   async createUserByAdmin(dto: AdminCreateUserDto) {
