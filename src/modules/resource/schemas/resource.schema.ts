@@ -1,8 +1,9 @@
-import { Prop, Schema } from "@nestjs/mongoose";
+import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
 import { Types } from "mongoose";
 import { ResourceType } from "../enums/resource-types.enum";
-import { ApprovalStatus } from "./approval-status.enum";
-import { FileType } from "./file-type.enum";
+import { ApprovalStatus } from "../enums/approval-status.enum";
+import { FileType } from "../enums/file-type.enum";
+import { IsMongoId } from "class-validator";
 
 
 
@@ -42,6 +43,7 @@ export class Resource {
   cloudinaryPublicId: string;
 
   // Ownership
+  @IsMongoId()
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   uploadedBy: Types.ObjectId;
 
@@ -70,3 +72,11 @@ export class Resource {
   @Prop({ default: Date.now })
   uploadDate: Date;
 }
+
+
+export const ResourceSchema = SchemaFactory.createForClass(Resource);
+
+ResourceSchema.index({ subject: 1, course: 1 });
+ResourceSchema.index({ uploadedBy: 1 });
+ResourceSchema.index({ approvalStatus: 1 });
+ResourceSchema.index({ tags: 1 });

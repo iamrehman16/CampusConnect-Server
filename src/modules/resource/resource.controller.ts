@@ -1,15 +1,26 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+} from '@nestjs/common';
 import { ResourceService } from './resource.service';
-import { CreateResourceDto } from './dto/create-resource.dto';
-import { UpdateResourceDto } from './dto/update-resource.dto';
+import { CreateResourceByContributorDto } from './dto/create-resource-contributor.dto';
+import { UpdateResourceByContributorDto } from './dto/update-resource-contributor.dto';
+import { Public } from '../auth/decorators/public.decorator';
 
-@Controller('resource')
+
+@Public() //temporary for testing
+@Controller('resources')
 export class ResourceController {
   constructor(private readonly resourceService: ResourceService) {}
 
   @Post()
-  create(@Body() createResourceDto: CreateResourceDto) {
-    return this.resourceService.create(createResourceDto);
+  create(@Body() dto: CreateResourceByContributorDto) {
+    return this.resourceService.create(dto);
   }
 
   @Get()
@@ -19,16 +30,20 @@ export class ResourceController {
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.resourceService.findOne(+id);
+    return this.resourceService.findOne(id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateResourceDto: UpdateResourceDto) {
-    return this.resourceService.update(+id, updateResourceDto);
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateResourceByContributorDto,
+  ) {
+    return this.resourceService.update(id, dto);
   }
+
 
   @Delete(':id')
   remove(@Param('id') id: string) {
-    return this.resourceService.remove(+id);
+    return this.resourceService.remove(id);
   }
 }
