@@ -9,6 +9,8 @@ import {
   Min,
   Max,
 } from 'class-validator';
+
+import { Transform, Type } from 'class-transformer';
 import { ResourceType } from '../enums/resource-types.enum';
 
 export class CreateResourceByContributorDto {
@@ -31,6 +33,7 @@ export class CreateResourceByContributorDto {
   @IsNotEmpty()
   course: string;
 
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(8)
@@ -42,5 +45,9 @@ export class CreateResourceByContributorDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
+  @Transform(({ value }) => {
+    if (typeof value === 'string') return value.split(',').map(v => v.trim()).filter(Boolean);
+    return value;
+  })
   tags?: string[];
 }

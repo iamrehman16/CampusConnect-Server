@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import dotenv from 'dotenv'
@@ -18,6 +19,10 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({
     whitelist:true,
     transform:true,
+    forbidNonWhitelisted: true,
+    transformOptions: {
+      enableImplicitConversion: true,
+    },
   }))
 
   //set common prefix

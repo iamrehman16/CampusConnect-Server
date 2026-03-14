@@ -26,6 +26,6 @@ import { CloudinaryService } from './modules/storage/cloudinary.service';
     StorageModule
   ],
   controllers: [AppController],
-  providers: [AppService, CloudinaryService],
+  providers: [AppService],
 })
 export class AppModule {}

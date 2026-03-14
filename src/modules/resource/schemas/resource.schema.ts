@@ -1,15 +1,11 @@
-import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
-import { Types } from "mongoose";
-import { ResourceType } from "../enums/resource-types.enum";
-import { ApprovalStatus } from "../enums/approval-status.enum";
-import { FileType } from "../enums/file-type.enum";
-import { IsMongoId } from "class-validator";
-
-
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { HydratedDocument, Types } from 'mongoose';
+import { ResourceType } from '../enums/resource-types.enum';
+import { ApprovalStatus } from '../enums/approval-status.enum';
+import { FileType } from '../enums/file-type.enum';
 
 @Schema({ timestamps: true })
 export class Resource {
-
   @Prop({ required: true, maxlength: 200 })
   title: string;
 
@@ -33,30 +29,32 @@ export class Resource {
   @Prop({ required: true, enum: FileType })
   fileType: FileType;
 
-  @Prop({ required: true, max: 20 * 1024 * 1024 })
+  @Prop({ required: true })
+  fileFormat: string;
+
+  @Prop({ required: true })
   fileSize: number;
 
   @Prop({ required: true })
-  filePath: string;
+  fileUrl: string;
 
-  @Prop()
+  @Prop({ required: true })
   cloudinaryPublicId: string;
 
   // Ownership
-  @IsMongoId()
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
-  uploadedBy: Types.ObjectId;
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  uploadedBy?: Types.ObjectId;
 
   // Moderation
   @Prop({ default: ApprovalStatus.PENDING, enum: ApprovalStatus })
   approvalStatus: ApprovalStatus;
 
+  @Prop()
+  rejectionReason?: string;
+
   // Community engagement
   @Prop({ type: [{ type: Types.ObjectId, ref: 'User' }], default: [] })
   upvotes: Types.ObjectId[];
-
-  @Prop({ default: 0 })
-  upvoteCount: number;
 
   @Prop({ default: 0 })
   downloads: number;
@@ -68,12 +66,9 @@ export class Resource {
   // Soft delete
   @Prop({ default: false })
   isDeleted: boolean;
-
-  @Prop({ default: Date.now })
-  uploadDate: Date;
 }
 
-
+export type ResourceDocument = HydratedDocument<Resource>;
 export const ResourceSchema = SchemaFactory.createForClass(Resource);
 
 ResourceSchema.index({ subject: 1, course: 1 });
