@@ -8,6 +8,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { ResourceModule } from './modules/resource/resource.module';
 import { StorageModule } from './modules/storage/storage.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { PostModule } from './modules/post/post.module';
 
 @Module({
   imports: [
@@ -24,7 +25,8 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     AuthModule,
     ResourceModule,
     StorageModule,
-    DashboardModule
+    DashboardModule,
+    PostModule
   ],
   controllers: [AppController],
   providers: [AppService],
