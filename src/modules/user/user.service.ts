@@ -98,6 +98,18 @@ export class UserService {
     return updatedUser;
   }
 
+  async updateRole(id: string, role: Roles) {
+    const updatedUser = await this.userModel
+      .findByIdAndUpdate(id, { role }, { new: true })
+      .exec();
+
+    if (!updatedUser) {
+      throw new NotFoundException(`User with id ${id} not found`);
+    }
+
+    return updatedUser;
+  }
+
   async updateProfile(userId: string, dto: UpdateUserProfileDto) {
     if (dto.password) {
       dto.password = await bcrypt.hash(dto.password, 10);
@@ -120,6 +132,14 @@ export class UserService {
       throw new NotFoundException(`User with id ${id} not found`);
     }
     return deletedUser;
+  }
+
+  async getStats() {
+    const [total, contributors] = await Promise.all([
+      this.userModel.countDocuments(),
+      this.userModel.countDocuments({ role: Roles.CONTRIBUTOR }),
+    ]);
+    return { total, contributors };
   }
 
   async updateRefreshToken(userId: string, hashedRefreshToken: string | null) {

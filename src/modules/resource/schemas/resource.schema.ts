@@ -52,7 +52,7 @@ export class Resource {
   @Prop()
   rejectionReason?: string;
 
-  // Community engagement
+  // Community engagement - not considered for now
   @Prop({ type: [{ type: Types.ObjectId, ref: 'User' }], default: [] })
   upvotes: Types.ObjectId[];
 
@@ -75,3 +75,7 @@ ResourceSchema.index({ subject: 1, course: 1 });
 ResourceSchema.index({ uploadedBy: 1 });
 ResourceSchema.index({ approvalStatus: 1 });
 ResourceSchema.index({ tags: 1 });
+ResourceSchema.index(
+  { title: 'text', description: 'text', subject: 'text', course: 'text', tags: 'text' },
+  { weights: { title: 10, subject: 5, course: 5, tags: 5, description: 1 } },
+);

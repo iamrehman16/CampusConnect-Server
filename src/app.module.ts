@@ -7,7 +7,7 @@ import { UserModule } from './modules/user/user.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ResourceModule } from './modules/resource/resource.module';
 import { StorageModule } from './modules/storage/storage.module';
-import { CloudinaryService } from './modules/storage/cloudinary.service';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -23,7 +23,8 @@ import { CloudinaryService } from './modules/storage/cloudinary.service';
     UserModule,
     AuthModule,
     ResourceModule,
-    StorageModule
+    StorageModule,
+    DashboardModule
   ],
   controllers: [AppController],
   providers: [AppService],

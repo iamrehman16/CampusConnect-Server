@@ -5,11 +5,11 @@ import {
   Body,
   Patch,
   Param,
-  Delete,
   UseInterceptors,
   UploadedFile,
   Res,
   Req,
+  Query,
 } from '@nestjs/common';
 import * as express from 'express';
 import { ResourceService } from './resource.service';
@@ -22,7 +22,7 @@ import { FileValidationPipe } from '../storage/common/file-validation.pipe';
 import { memoryStorage } from 'multer';
 import { Role } from '../auth/decorators/role.decorator';
 import { Roles } from '../user/enums/user-role.enum';
-import { RejectResourceDto } from './dto/reject-resource.dto';
+import { ResourceQueryDto } from './dto/resource-query.dto';
 
 @Controller('resources')
 export class ResourceController {
@@ -39,14 +39,13 @@ export class ResourceController {
     @UploadedFile(FileValidationPipe) file: Express.Multer.File,
     @Body() dto: CreateResourceByContributorDto,
   ) {
-    console.log(dto);
     return this.resourceService.create(dto, file);
   }
 
   @Public()
   @Get()
-  findAll() {
-    return this.resourceService.findAll();
+  async findAll(@Query() query: ResourceQueryDto) {
+    return this.resourceService.findAll(query);
   }
 
   @Public()
@@ -65,15 +64,6 @@ export class ResourceController {
     return res.redirect(url);
   }
 
-  @Role(Roles.ADMIN)
-  @Patch(':id')
-  update(
-    @Param('id', ParseMongoIdPipe) id: string,
-    @Body() dto: UpdateResourceByContributorDto,
-  ) {
-    return this.resourceService.update(id, dto);
-  }
-
   @Patch(':id/my')
   @Role(Roles.CONTRIBUTOR)
   updateOwn(
@@ -82,26 +72,5 @@ export class ResourceController {
     @Req() req,
   ) {
     return this.resourceService.updateOwn(id, dto, req.user.id);
-  }
-
-  @Role(Roles.ADMIN)
-  @Delete(':id')
-  remove(@Param('id', ParseMongoIdPipe) id: string) {
-    return this.resourceService.remove(id);
-  }
-
-  @Patch(':id/approve')
-  @Role(Roles.ADMIN)
-  approve(@Param('id', ParseMongoIdPipe) id: string) {
-    return this.resourceService.approve(id);
-  }
-
-  @Patch(':id/reject')
-  @Role(Roles.ADMIN)
-  reject(
-    @Param('id', ParseMongoIdPipe) id: string,
-    @Body() dto: RejectResourceDto,
-  ) {
-    return this.resourceService.reject(id, dto.reason);
   }
 }

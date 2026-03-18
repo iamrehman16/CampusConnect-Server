@@ -12,6 +12,10 @@ import { CreateResourceByContributorDto } from './dto/create-resource-contributo
 import { UpdateResourceByContributorDto } from './dto/update-resource-contributor.dto';
 import { FileType } from './enums/file-type.enum';
 import { ApprovalStatus } from './enums/approval-status.enum';
+import { ResourceQueryDto } from './dto/resource-query.dto';
+import { PaginatedResponse } from 'src/common/interfaces/paginated-response.interface';
+import { buildResourceQuery } from './dto/queries/resource-query.builder';
+import { buildResourceSort } from './dto/queries/build-resource-sort';
 
 @Injectable()
 export class ResourceService {
@@ -27,6 +31,8 @@ export class ResourceService {
     let uploadResult;
     try {
       uploadResult = await this.cloudinaryService.uploadFile(file);
+      console.log(uploadResult);
+
     } catch (err) {
       throw new InternalServerErrorException(
         'Failed to upload file to Cloudinary',
@@ -56,11 +62,34 @@ export class ResourceService {
     }
   }
 
-  async findAll(): Promise<ResourceDocument[]> {
-    return this.resourceModel
-      .find({ isDeleted: false })
-      .sort({ createdAt: -1 })
-      .exec();
+  async findAll(
+    queryDto: ResourceQueryDto,
+  ): Promise<PaginatedResponse<ResourceDocument>> {
+    const mongoQuery = buildResourceQuery(queryDto);
+    const mongoSort = buildResourceSort(queryDto.sort);
+
+    const page = queryDto.page ?? 1;
+    const limit = queryDto.limit ?? 12;
+
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      this.resourceModel
+        .find(mongoQuery)
+        .sort(mongoSort as any)
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+
+      this.resourceModel.countDocuments(mongoQuery),
+    ]);
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+    };
   }
 
   async findOne(id: string): Promise<ResourceDocument> {
@@ -152,6 +181,24 @@ export class ResourceService {
     if (!resource)
       throw new NotFoundException('Resource not found or not pending approval');
     return resource;
+  }
+
+  async getStats() {
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+    const [total, pending, pastWeek] = await Promise.all([
+      this.resourceModel.countDocuments({ isDeleted: false }),
+      this.resourceModel.countDocuments({
+        approvalStatus: ApprovalStatus.PENDING,
+        isDeleted: false,
+      }),
+      this.resourceModel.countDocuments({
+        createdAt: { $gte: oneWeekAgo },
+        isDeleted: false,
+      }),
+    ]);
+    return { total, pending, uploadedPastWeek: pastWeek };
   }
 
   private inferFileType(format?: string, originalName?: string): FileType {
