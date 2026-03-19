@@ -10,15 +10,17 @@ import {
 } from '@nestjs/common';
 import { PostService } from './post.service';
 import { CreatePostDto, UpdatePostDto } from './dto/post.dto';
-import { CreateCommentDto } from './dto/admin-post.dto';
+import { CreateCommentDto } from './dto/create-comment.dto';
 import { Public } from '../auth/decorators/public.decorator';
+import { CurrentUser } from '../auth/types/current-user';
 
+@Public()
 @Controller('posts')
 export class PostController {
   constructor(private readonly postService: PostService) {}
 
   @Post()
-  create(@Body() dto: CreatePostDto, @Req() req) {
+  create(@Body() dto: CreatePostDto, @Req() req: { user: CurrentUser }) {
     return this.postService.create(dto, req.user.id);
   }
 
@@ -35,17 +37,21 @@ export class PostController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdatePostDto, @Req() req) {
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdatePostDto,
+    @Req() req: { user: CurrentUser },
+  ) {
     return this.postService.update(id, dto, req.user.id);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string, @Req() req) {
+  remove(@Param('id') id: string, @Req() req: { user: CurrentUser }) {
     return this.postService.softDelete(id, req.user.id);
   }
 
   @Post(':id/upvote')
-  toggleUpvote(@Param('id') id: string, @Req() req) {
+  toggleUpvote(@Param('id') id: string, @Req() req: { user: CurrentUser }) {
     return this.postService.toggleUpvote(id, req.user.id);
   }
 
@@ -53,7 +59,7 @@ export class PostController {
   addComment(
     @Param('id') postId: string,
     @Body() dto: CreateCommentDto,
-    @Req() req,
+    @Req() req: { user: CurrentUser },
   ) {
     return this.postService.addComment(postId, dto, req.user.id);
   }

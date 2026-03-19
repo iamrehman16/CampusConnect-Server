@@ -20,6 +20,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^11.0.1",
@@ -30,6 +31,7 @@
     "@nestjs/platform-express": "^11.1.14",
     "@nestjs/platform-socket.io": "^11.1.14",
     "@nestjs/websockets": "^11.1.14",
+    "@qdrant/js-client-rest": "^1.17.0",
     "argon2": "^0.44.0",
     "axios": "^1.13.6",
     "bcrypt": "^6.0.0",
@@ -37,6 +39,8 @@
     "class-validator": "^0.14.4",
     "cloudinary": "^2.9.0",
     "dotenv": "^17.3.1",
+    "groq-sdk": "^1.1.1",
+    "llamaindex": "^0.12.1",
     "mongoose": "^9.2.3",
     "multer": "^2.1.0",
     "node-fetch": "^3.3.2",

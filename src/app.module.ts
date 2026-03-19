@@ -9,6 +9,7 @@ import { ResourceModule } from './modules/resource/resource.module';
 import { StorageModule } from './modules/storage/storage.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { PostModule } from './modules/post/post.module';
+import { AiModule } from './modules/ai/ai.module';
 
 @Module({
   imports: [
@@ -26,7 +27,8 @@ import { PostModule } from './modules/post/post.module';
     ResourceModule,
     StorageModule,
     DashboardModule,
-    PostModule
+    PostModule,
+    AiModule
   ],
   controllers: [AppController],
   providers: [AppService],
