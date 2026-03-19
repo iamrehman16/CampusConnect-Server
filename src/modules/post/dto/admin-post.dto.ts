@@ -8,9 +8,3 @@ export class AdminUpdatePostDto extends PartialType(CreatePostDto) {
   isDeleted?: boolean;
 }
 
-export class CreateCommentDto {
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(1000)
-  content: string;
-}

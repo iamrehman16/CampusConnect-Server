@@ -2,7 +2,6 @@ import {
   Injectable,
   NotFoundException,
   InternalServerErrorException,
-  ForbiddenException,
 } from '@nestjs/common';
 import { CloudinaryService } from '../storage/cloudinary.service';
 import { InjectModel } from '@nestjs/mongoose';
@@ -10,12 +9,12 @@ import { Resource, ResourceDocument } from './schemas/resource.schema';
 import { Model } from 'mongoose';
 import { CreateResourceByContributorDto } from './dto/create-resource-contributor.dto';
 import { UpdateResourceByContributorDto } from './dto/update-resource-contributor.dto';
-import { FileType } from './enums/file-type.enum';
 import { ApprovalStatus } from './enums/approval-status.enum';
 import { ResourceQueryDto } from './dto/resource-query.dto';
 import { PaginatedResponse } from 'src/common/interfaces/paginated-response.interface';
 import { buildResourceQuery } from './dto/queries/resource-query.builder';
 import { buildResourceSort } from './dto/queries/build-resource-sort';
+import { inferFileType } from "./utils/file.utils";
 
 @Injectable()
 export class ResourceService {
@@ -27,22 +26,18 @@ export class ResourceService {
   async create(
     dto: CreateResourceByContributorDto,
     file: Express.Multer.File,
-  ): Promise<ResourceDocument> {
+  ): Promise<Resource> {
     let uploadResult;
     try {
       uploadResult = await this.cloudinaryService.uploadFile(file);
-      console.log(uploadResult);
-
     } catch (err) {
-      throw new InternalServerErrorException(
-        'Failed to upload file to Cloudinary',
-      );
+      throw new InternalServerErrorException('Upload to storage failed');
     }
 
-    const fileType = this.inferFileType(uploadResult.format, file.originalname);
+    const fileType = inferFileType(uploadResult.format, file.originalname);
 
     try {
-      return await this.resourceModel.create({
+      const resource = await this.resourceModel.create({
         ...dto,
         fileUrl: uploadResult.url,
         cloudinaryPublicId: uploadResult.publicId,
@@ -50,27 +45,24 @@ export class ResourceService {
         fileType,
         fileSize: uploadResult.bytes,
       });
+      return resource.toObject();
     } catch (err) {
       if (uploadResult?.publicId) {
         await this.cloudinaryService
           .deleteFile(uploadResult.publicId)
           .catch(() => null);
       }
-      throw new InternalServerErrorException(
-        'Failed to save resource to database',
-      );
+      throw new InternalServerErrorException('Database save failed. File rolled back.');
     }
   }
 
   async findAll(
     queryDto: ResourceQueryDto,
-  ): Promise<PaginatedResponse<ResourceDocument>> {
+  ): Promise<PaginatedResponse<Resource>> {
     const mongoQuery = buildResourceQuery(queryDto);
     const mongoSort = buildResourceSort(queryDto.sort);
-
     const page = queryDto.page ?? 1;
     const limit = queryDto.limit ?? 12;
-
     const skip = (page - 1) * limit;
 
     const [data, total] = await Promise.all([
@@ -79,141 +71,156 @@ export class ResourceService {
         .sort(mongoSort as any)
         .skip(skip)
         .limit(limit)
-        .lean(),
-
+        .lean()
+        .exec(),
       this.resourceModel.countDocuments(mongoQuery),
     ]);
 
     return {
-      data,
+      data: data as Resource[],
       total,
       page,
       limit,
     };
   }
 
-  async findOne(id: string): Promise<ResourceDocument> {
-    const resource = await this.resourceModel.findOne({
-      _id: id,
-      isDeleted: false,
-    });
+  async findOne(id: string): Promise<Resource> {
+    const resource = await this.resourceModel
+      .findOne({ _id: id, isDeleted: false })
+      .lean()
+      .exec();
+
     if (!resource) throw new NotFoundException('Resource not found');
-    return resource;
+    return resource as Resource;
   }
 
   async update(
     id: string,
     dto: UpdateResourceByContributorDto,
-  ): Promise<ResourceDocument> {
-    const resource = await this.resourceModel.findOneAndUpdate(
-      { _id: id, isDeleted: false },
-      dto,
-      { new: true },
-    );
+  ): Promise<Resource> {
+    const resource = await this.resourceModel
+      .findOneAndUpdate({ _id: id, isDeleted: false }, dto, { new: true })
+      .lean()
+      .exec();
+
     if (!resource) throw new NotFoundException('Resource not found');
-    return resource;
+    return resource as Resource;
   }
 
   async updateOwn(
     id: string,
     dto: UpdateResourceByContributorDto,
     userId: string,
-  ): Promise<ResourceDocument> {
-    const resource = await this.resourceModel.findOneAndUpdate(
-      {
-        _id: id,
-        uploadedBy: userId,
-        isDeleted: false,
-      },
-      dto,
-      { new: true, runValidators: true },
-    );
+  ): Promise<Resource> {
+    const resource = await this.resourceModel
+      .findOneAndUpdate(
+        { _id: id, uploadedBy: userId, isDeleted: false },
+        dto,
+        { new: true, runValidators: true },
+      )
+      .lean()
+      .exec();
 
     if (!resource) {
-      throw new NotFoundException('Resource not found or you do not own it');
+      throw new NotFoundException('Resource not found or ownership mismatch');
     }
 
-    return resource;
+    return resource as Resource;
   }
 
   async remove(id: string): Promise<{ message: string }> {
-    const resource = await this.findOne(id);
+    const resource = await this.resourceModel
+      .findOneAndUpdate(
+        { _id: id, isDeleted: false },
+        { isDeleted: true },
+        { new: false }, 
+      )
+      .lean()
+      .exec();
 
-    if (resource.cloudinaryPublicId) {
-      await this.cloudinaryService
-        .deleteFile(resource.cloudinaryPublicId)
-        .catch(() => null);
+    if (!resource) {
+      throw new NotFoundException('Resource not found or already deleted');
     }
 
-    await this.resourceModel.findByIdAndUpdate(id, { isDeleted: true });
+    if (resource.cloudinaryPublicId) {
+      this.cloudinaryService
+        .deleteFile(resource.cloudinaryPublicId)
+        .catch((err) => console.error(`Cleanup failed for ${resource.cloudinaryPublicId}:`, err));
+    }
 
     return { message: 'Resource deleted successfully' };
   }
 
   async getDownloadUrl(id: string): Promise<string> {
-    const resource = await this.resourceModel.findOneAndUpdate(
-      { _id: id, isDeleted: false },
-      { $inc: { downloads: 1 } },
-      { new: true },
-    );
-    if (!resource) throw new NotFoundException('Resource not found');
+    const resource = await this.resourceModel
+      .findOneAndUpdate(
+        { _id: id, isDeleted: false },
+        { $inc: { downloads: 1 } },
+        { new: true },
+      )
+      .lean()
+      .exec();
 
+    if (!resource) throw new NotFoundException('Resource not found');
     return this.cloudinaryService.generateDownloadUrl(resource.fileUrl);
   }
 
-  async approve(id: string): Promise<ResourceDocument> {
-    const resource = await this.resourceModel.findOneAndUpdate(
-      { _id: id, isDeleted: false, approvalStatus: ApprovalStatus.PENDING },
-      { approvalStatus: ApprovalStatus.APPROVED },
-      { new: true },
-    );
-    if (!resource)
-      throw new NotFoundException('Resource not found or not pending approval');
-    return resource;
+  async approve(id: string): Promise<Resource> {
+    const resource = await this.resourceModel
+      .findOneAndUpdate(
+        { _id: id, isDeleted: false, approvalStatus: ApprovalStatus.PENDING },
+        { approvalStatus: ApprovalStatus.APPROVED },
+        { new: true },
+      )
+      .lean()
+      .exec();
+
+    if (!resource) throw new NotFoundException('Resource not found or not pending');
+    return resource as Resource;
   }
 
-  async reject(id: string, reason: string): Promise<ResourceDocument> {
-    const resource = await this.resourceModel.findOneAndUpdate(
-      { _id: id, isDeleted: false, approvalStatus: ApprovalStatus.PENDING },
-      { approvalStatus: ApprovalStatus.REJECTED, rejectionReason: reason },
-      { new: true },
-    );
-    if (!resource)
-      throw new NotFoundException('Resource not found or not pending approval');
-    return resource;
+  async reject(id: string, reason: string): Promise<Resource> {
+    const resource = await this.resourceModel
+      .findOneAndUpdate(
+        { _id: id, isDeleted: false, approvalStatus: ApprovalStatus.PENDING },
+        { approvalStatus: ApprovalStatus.REJECTED, rejectionReason: reason },
+        { new: true },
+      )
+      .lean()
+      .exec();
+
+    if (!resource) throw new NotFoundException('Resource not found or not pending');
+    return resource as Resource;
   }
 
   async getStats() {
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
-    const [total, pending, pastWeek] = await Promise.all([
-      this.resourceModel.countDocuments({ isDeleted: false }),
-      this.resourceModel.countDocuments({
-        approvalStatus: ApprovalStatus.PENDING,
-        isDeleted: false,
-      }),
-      this.resourceModel.countDocuments({
-        createdAt: { $gte: oneWeekAgo },
-        isDeleted: false,
-      }),
+    const [stats] = await this.resourceModel.aggregate([
+      { $match: { isDeleted: false } },
+      {
+        $facet: {
+          total: [{ $count: 'count' }],
+          pending: [
+            { $match: { approvalStatus: ApprovalStatus.PENDING } },
+            { $count: 'count' },
+          ],
+          uploadedPastWeek: [
+            { $match: { createdAt: { $gte: oneWeekAgo } } },
+            { $count: 'count' },
+          ],
+        },
+      },
+      {
+        $project: {
+          total: { $arrayElemAt: ['$total.count', 0] },
+          pending: { $arrayElemAt: ['$pending.count', 0] },
+          uploadedPastWeek: { $arrayElemAt: ['$uploadedPastWeek.count', 0] },
+        },
+      },
     ]);
-    return { total, pending, uploadedPastWeek: pastWeek };
-  }
 
-  private inferFileType(format?: string, originalName?: string): FileType {
-    const ext = originalName?.split('.').pop()?.toLowerCase() || '';
-    const normalized = format?.toLowerCase() || ext;
-
-    if (['pdf'].includes(normalized)) return FileType.PDF;
-    if (['doc', 'docx'].includes(normalized)) return FileType.DOC;
-    if (['ppt', 'pptx'].includes(normalized)) return FileType.PPT;
-    if (['zip'].includes(normalized)) return FileType.ZIP;
-    if (
-      ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'tiff'].includes(normalized)
-    )
-      return FileType.IMAGE;
-
-    return FileType.OTHER;
+    return stats || { total: 0, pending: 0, uploadedPastWeek: 0 };
   }
 }
