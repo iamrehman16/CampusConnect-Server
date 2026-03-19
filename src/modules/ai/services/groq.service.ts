@@ -17,13 +17,18 @@ export class GroqService {
 
   async generateResponse(query: string): Promise<string> {
     const response = await this.groq.chat.completions.create({
-      messages: [{ role: 'user', content: query }],
-      model: this.aiCfg.models.reasoning, 
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You are CampusConnect AI, a helpful academic assistant for university students. Answer clearly and concisely.',
+        },
+        { role: 'user', content: query },
+      ],
+      model: this.aiCfg.models.reasoning,
     });
-
     return response.choices[0]?.message?.content || '';
   }
-
   async summarize(content: string): Promise<string> {
     const completion = await this.groq.chat.completions.create({
       messages: [
