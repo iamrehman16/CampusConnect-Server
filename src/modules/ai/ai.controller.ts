@@ -1,17 +1,23 @@
-import { Body, Controller, Post } from '@nestjs/common';
-import { AiChatService } from './services/ai-chat.service';
+import { Body, Controller, Delete, Post, Req } from '@nestjs/common';
 import { ChatMessageDto } from './dto/chat-message.dto';
-import { Public } from '../auth/decorators/public.decorator';
+import { AiChatService } from './services/ai-chat.service';
 
-
-@Public()
 @Controller('ai')
 export class AiController {
   constructor(private readonly aiChatService: AiChatService) {}
 
   @Post('chat')
-  async chat(@Body() chatMessageDto: ChatMessageDto) {
-    const answer = await this.aiChatService.getChatResponse(chatMessageDto.message);
+  async chat(@Req() req, @Body() chatMessageDto: ChatMessageDto) {
+    const answer = await this.aiChatService.getChatResponse(
+      req.user.id,
+      chatMessageDto.message,
+    );
     return { answer };
+  }
+
+  @Delete('chat/session')
+  async clearSession(@Req() req) {
+    await this.aiChatService.clearSession(req.user.id);
+    return { message: 'Session cleared' };
   }
 }
