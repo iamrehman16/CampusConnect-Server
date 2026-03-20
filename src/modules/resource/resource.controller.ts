@@ -23,6 +23,7 @@ import { memoryStorage } from 'multer';
 import { Role } from '../auth/decorators/role.decorator';
 import { Roles } from '../user/enums/user-role.enum';
 import { ResourceQueryDto } from './dto/resource-query.dto';
+import { CurrentUser } from '../auth/types/current-user';
 
 @Controller('resources')
 export class ResourceController {
@@ -38,8 +39,9 @@ export class ResourceController {
   create(
     @UploadedFile(FileValidationPipe) file: Express.Multer.File,
     @Body() dto: CreateResourceByContributorDto,
+    @Req() req: { user: CurrentUser }
   ) {
-    return this.resourceService.create(dto, file);
+    return this.resourceService.create(dto, file, req.user.id);
   }
 
   @Public()

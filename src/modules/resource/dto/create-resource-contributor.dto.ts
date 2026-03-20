@@ -39,6 +39,7 @@ export class CreateResourceByContributorDto {
   @Max(8)
   semester: number;
 
+  @IsNotEmpty()
   @IsEnum(ResourceType)
   resourceType: ResourceType;
 

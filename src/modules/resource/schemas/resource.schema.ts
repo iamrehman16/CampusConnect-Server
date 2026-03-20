@@ -42,8 +42,8 @@ export class Resource {
   cloudinaryPublicId: string;
 
   // Ownership
-  @Prop({ type: Types.ObjectId, ref: 'User' })
-  uploadedBy?: Types.ObjectId;
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  uploadedBy: Types.ObjectId;
 
   // Moderation
   @Prop({ default: ApprovalStatus.PENDING, enum: ApprovalStatus })
@@ -58,6 +58,9 @@ export class Resource {
 
   @Prop({ default: 0 })
   downloads: number;
+
+  @Prop({ required: true, enum: ['image', 'video', 'raw'] })
+  cloudinaryResourceType: string;
 
   // Search
   @Prop({ type: [String], default: [] })
@@ -76,6 +79,12 @@ ResourceSchema.index({ uploadedBy: 1 });
 ResourceSchema.index({ approvalStatus: 1 });
 ResourceSchema.index({ tags: 1 });
 ResourceSchema.index(
-  { title: 'text', description: 'text', subject: 'text', course: 'text', tags: 'text' },
+  {
+    title: 'text',
+    description: 'text',
+    subject: 'text',
+    course: 'text',
+    tags: 'text',
+  },
   { weights: { title: 10, subject: 5, course: 5, tags: 5, description: 1 } },
 );

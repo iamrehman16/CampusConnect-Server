@@ -14,7 +14,7 @@ import { ResourceQueryDto } from './dto/resource-query.dto';
 import { PaginatedResponse } from 'src/common/interfaces/paginated-response.interface';
 import { buildResourceQuery } from './dto/queries/resource-query.builder';
 import { buildResourceSort } from './dto/queries/build-resource-sort';
-import { inferFileType } from "./utils/file.utils";
+import { inferFileType } from './utils/file.utils';
 
 @Injectable()
 export class ResourceService {
@@ -26,6 +26,7 @@ export class ResourceService {
   async create(
     dto: CreateResourceByContributorDto,
     file: Express.Multer.File,
+    userId: string,
   ): Promise<Resource> {
     let uploadResult;
     try {
@@ -34,25 +35,37 @@ export class ResourceService {
       throw new InternalServerErrorException('Upload to storage failed');
     }
 
-    const fileType = inferFileType(uploadResult.format, file.originalname);
+    const fileFormat =
+      uploadResult.format ||
+      file.originalname.split('.').pop()?.toLowerCase() ||
+      'unknown';
+
+    const fileType = inferFileType(fileFormat, file.originalname);
 
     try {
       const resource = await this.resourceModel.create({
         ...dto,
         fileUrl: uploadResult.url,
         cloudinaryPublicId: uploadResult.publicId,
-        fileFormat: uploadResult.format,
+        fileFormat,
+        cloudinaryResourceType: uploadResult.resourceType,
         fileType,
         fileSize: uploadResult.bytes,
+        uploadedBy: userId,
       });
+
       return resource.toObject();
     } catch (err) {
+      console.log('The error is', err);
+
       if (uploadResult?.publicId) {
         await this.cloudinaryService
-          .deleteFile(uploadResult.publicId)
+          .deleteFile(uploadResult.publicId, uploadResult.resourceType)
           .catch(() => null);
       }
-      throw new InternalServerErrorException('Database save failed. File rolled back.');
+      throw new InternalServerErrorException(
+        'Database save failed. File rolled back.',
+      );
     }
   }
 
@@ -65,23 +78,27 @@ export class ResourceService {
     const limit = queryDto.limit ?? 12;
     const skip = (page - 1) * limit;
 
-    const [data, total] = await Promise.all([
-      this.resourceModel
-        .find(mongoQuery)
-        .sort(mongoSort as any)
-        .skip(skip)
-        .limit(limit)
-        .lean()
-        .exec(),
-      this.resourceModel.countDocuments(mongoQuery),
-    ]);
+    try {
+      const [data, total] = await Promise.all([
+        this.resourceModel
+          .find(mongoQuery)
+          .sort(mongoSort as any)
+          .skip(skip)
+          .limit(limit)
+          .lean()
+          .exec(),
+        this.resourceModel.countDocuments(mongoQuery),
+      ]);
 
-    return {
-      data: data as Resource[],
-      total,
-      page,
-      limit,
-    };
+      return {
+        data: data as Resource[],
+        total,
+        page,
+        limit,
+      };
+    } catch {
+      throw new InternalServerErrorException('Failed to fetch resources');
+    }
   }
 
   async findOne(id: string): Promise<Resource> {
@@ -133,7 +150,7 @@ export class ResourceService {
       .findOneAndUpdate(
         { _id: id, isDeleted: false },
         { isDeleted: true },
-        { new: false }, 
+        { new: false },
       )
       .lean()
       .exec();
@@ -144,8 +161,16 @@ export class ResourceService {
 
     if (resource.cloudinaryPublicId) {
       this.cloudinaryService
-        .deleteFile(resource.cloudinaryPublicId)
-        .catch((err) => console.error(`Cleanup failed for ${resource.cloudinaryPublicId}:`, err));
+        .deleteFile(
+          resource.cloudinaryPublicId,
+          resource.cloudinaryResourceType as 'image' | 'video' | 'raw',
+        )
+        .catch((err) =>
+          console.error(
+            `Cleanup failed for ${resource.cloudinaryPublicId}:`,
+            err,
+          ),
+        );
     }
 
     return { message: 'Resource deleted successfully' };
@@ -175,7 +200,8 @@ export class ResourceService {
       .lean()
       .exec();
 
-    if (!resource) throw new NotFoundException('Resource not found or not pending');
+    if (!resource)
+      throw new NotFoundException('Resource not found or not pending');
     return resource as Resource;
   }
 
@@ -189,7 +215,8 @@ export class ResourceService {
       .lean()
       .exec();
 
-    if (!resource) throw new NotFoundException('Resource not found or not pending');
+    if (!resource)
+      throw new NotFoundException('Resource not found or not pending');
     return resource as Resource;
   }
 
@@ -197,30 +224,34 @@ export class ResourceService {
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
-    const [stats] = await this.resourceModel.aggregate([
-      { $match: { isDeleted: false } },
-      {
-        $facet: {
-          total: [{ $count: 'count' }],
-          pending: [
-            { $match: { approvalStatus: ApprovalStatus.PENDING } },
-            { $count: 'count' },
-          ],
-          uploadedPastWeek: [
-            { $match: { createdAt: { $gte: oneWeekAgo } } },
-            { $count: 'count' },
-          ],
+    try {
+      const [stats] = await this.resourceModel.aggregate([
+        { $match: { isDeleted: false } },
+        {
+          $facet: {
+            total: [{ $count: 'count' }],
+            pending: [
+              { $match: { approvalStatus: ApprovalStatus.PENDING } },
+              { $count: 'count' },
+            ],
+            uploadedPastWeek: [
+              { $match: { createdAt: { $gte: oneWeekAgo } } },
+              { $count: 'count' },
+            ],
+          },
         },
-      },
-      {
-        $project: {
-          total: { $arrayElemAt: ['$total.count', 0] },
-          pending: { $arrayElemAt: ['$pending.count', 0] },
-          uploadedPastWeek: { $arrayElemAt: ['$uploadedPastWeek.count', 0] },
+        {
+          $project: {
+            total: { $arrayElemAt: ['$total.count', 0] },
+            pending: { $arrayElemAt: ['$pending.count', 0] },
+            uploadedPastWeek: { $arrayElemAt: ['$uploadedPastWeek.count', 0] },
+          },
         },
-      },
-    ]);
+      ]);
 
-    return stats || { total: 0, pending: 0, uploadedPastWeek: 0 };
+      return stats || { total: 0, pending: 0, uploadedPastWeek: 0 };
+    } catch {
+      throw new InternalServerErrorException('Failed to fetch resource stats');
+    }
   }
 }
