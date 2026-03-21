@@ -15,6 +15,8 @@ import {
   ConversationSession,
   ConversationSessionSchema,
 } from './schema/conversation-session.schema';
+import { ChunkingService } from './services/chunking.service';
+import { RetrievalService } from './services/retrieval.service';
 
 @Module({
   imports: [
@@ -33,6 +35,8 @@ import {
     EmbeddingService,
     VectorStoreService,
     ResourceApprovedListener,
+    ChunkingService,
+    RetrievalService,
   ],
   exports: [AiChatService],
 })

@@ -71,6 +71,21 @@ export class VectorStoreService implements OnModuleInit {
     }
   }
 
+  async upsertMany(
+    points: { id: string; vector: number[]; payload: Record<string, any> }[],
+  ): Promise<void> {
+    try {
+      await this.client.upsert(this.COLLECTION_NAME, {
+        wait: true,
+        points,
+      });
+      this.logger.log(`Batch upserted ${points.length} points`);
+    } catch (err) {
+      this.logger.error('Failed to batch upsert vectors', err);
+      throw err;
+    }
+  }
+
   async search(
     vector: number[],
     filter: Record<string, any>,

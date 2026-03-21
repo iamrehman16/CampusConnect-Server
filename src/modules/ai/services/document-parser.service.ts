@@ -6,7 +6,8 @@ import * as os from 'os';
 import * as path from 'path';
 import FormData from 'form-data';
 import { fetchBuffer, fetchJson } from '../commom/utils/http.utils';
-import nodeFetch from 'node-fetch'
+import nodeFetch from 'node-fetch';
+import { DocumentChunk, ParsedDocument } from '../interfaces/document-chunk.interface';
 
 @Injectable()
 export class DocumentParserService {
@@ -52,7 +53,7 @@ export class DocumentParserService {
           Authorization: `Bearer ${this.aiCfg.llamaCloudApiKey}`,
           ...formData.getHeaders(),
         },
-        body: formData, // no 'as any' needed with node-fetch
+        body: formData, 
       });
 
       if (response.ok) {
@@ -76,18 +77,25 @@ export class DocumentParserService {
 
     throw new Error('LlamaParse upload failed after all retries');
   }
-  private async pollForResult(jobId: string): Promise<string> {
+  private async pollForResult(
+    jobId: string,
+  ): Promise<Array<{ text: string; metadata: any }>> {
     for (let attempt = 0; attempt < this.MAX_POLL_ATTEMPTS; attempt++) {
       const response = await fetch(
-        `${this.LLAMA_PARSE_BASE_URL}/job/${jobId}/result/markdown`,
+        `${this.LLAMA_PARSE_BASE_URL}/job/${jobId}/result/json`,
         {
           headers: { Authorization: `Bearer ${this.aiCfg.llamaCloudApiKey}` },
         },
       );
 
       if (response.ok) {
-        const data = (await response.json()) as { markdown: string };
-        return data.markdown;
+        const data = (await response.json()) as {
+          pages: Array<{ text: string; page: number }>;
+        };
+        return data.pages.map((p) => ({
+          text: p.text,
+          metadata: { page_label: String(p.page) },
+        }));
       }
 
       if (response.status !== 404) {
@@ -107,28 +115,35 @@ export class DocumentParserService {
     );
   }
 
-  async parse(fileUrl: string, resourceId: string): Promise<string> {
+  async parse(fileUrl: string, resourceId: string): Promise<ParsedDocument> {
     let tempPath: string | null = null;
 
     try {
       tempPath = await this.downloadToTemp(fileUrl, resourceId);
-
       const jobId = await this.uploadForParsing(tempPath);
       this.logger.log(
         `LlamaParse job started: ${jobId} for resource: ${resourceId}`,
       );
 
-      const markdown = await this.pollForResult(jobId);
+      const pages = await this.pollForResult(jobId);
 
-      if (!markdown?.trim()) {
+      if (!pages.length) {
         this.logger.warn(`Empty parse result for resource: ${resourceId}`);
-        return '';
+        return { chunks: [], totalPages: 0 };
       }
 
+      const chunks: DocumentChunk[] = pages
+        .filter((p) => p.text?.trim()) 
+        .map((p, index) => ({
+          text: p.text,
+          pageNumber: parseInt(p.metadata?.page_label ?? `${index + 1}`, 10),
+          chunkIndex: index,
+        }));
+
       this.logger.log(
-        `Parsed resource: ${resourceId}, characters: ${markdown.length}`,
+        `Parsed resource: ${resourceId} — ${chunks.length} pages`,
       );
-      return markdown;
+      return { chunks, totalPages: pages.length };
     } catch (err) {
       this.logger.error(
         `Failed to parse document for resource: ${resourceId}`,

@@ -39,7 +39,7 @@ export class EmbeddingService {
       });
 
       const results = await Promise.all(
-        texts.map(text =>
+        texts.map((text) =>
           model.embedContent({
             content: { parts: [{ text }], role: 'user' },
             taskType: 'RETRIEVAL_DOCUMENT' as any,
@@ -47,9 +47,27 @@ export class EmbeddingService {
         ),
       );
 
-      return results.map(r => r.embedding.values);
+      return results.map((r) => r.embedding.values);
     } catch (err) {
       this.logger.error('Failed to generate batch embeddings', err);
+      throw err;
+    }
+  }
+
+  async embedQuery(text: string): Promise<number[]> {
+    try {
+      const model = this.genAI.getGenerativeModel({
+        model: this.aiCfg.models.embedding,
+      });
+
+      const result = await model.embedContent({
+        content: { parts: [{ text }], role: 'user' },
+        taskType: 'RETRIEVAL_QUERY' as any,
+      });
+
+      return result.embedding.values;
+    } catch (err) {
+      this.logger.error('Failed to generate query embedding', err);
       throw err;
     }
   }

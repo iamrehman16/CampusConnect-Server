@@ -12,7 +12,7 @@ export class AiController {
       req.user.id,
       chatMessageDto.message,
     );
-    return { answer };
+    return answer;
   }
 
   @Delete('chat/session')

@@ -4,6 +4,7 @@ import { EmbeddingService } from './embedding.service';
 import { VectorStoreService } from './vector-store.service';
 import { Resource } from '../../resource/schemas/resource.schema';
 import { createHash } from 'crypto';
+import { ChunkingService } from './chunking.service';
 
 @Injectable()
 export class IngestionService {
@@ -13,39 +14,60 @@ export class IngestionService {
     private readonly documentParserService: DocumentParserService,
     private readonly embeddingService: EmbeddingService,
     private readonly vectorStoreService: VectorStoreService,
+    private readonly chunkingService: ChunkingService
   ) {}
 
   async ingest(resource: Resource & { _id: any }): Promise<void> {
     const resourceId = resource._id.toString();
-    const pointId = this.toUuid(resourceId); // ← convert here
-
     this.logger.log(`Starting ingestion for resource: ${resourceId}`);
 
-    const text = await this.documentParserService.parse(
+    // 1. Parse — get pages
+    const parsed = await this.documentParserService.parse(
       resource.fileUrl,
       resourceId,
     );
 
-    if (!text.trim()) {
+    if (!parsed.chunks.length) {
       this.logger.warn(
         `Skipping ingestion for resource: ${resourceId} — empty parse result`,
       );
       return;
     }
 
-    const vector = await this.embeddingService.embed(text);
+    // 2. Chunk — split long pages, preserve page numbers
+    const chunks = this.chunkingService.chunkDocument(parsed);
+    this.logger.log(
+      `Resource ${resourceId} split into ${chunks.length} chunks`,
+    );
 
-    await this.vectorStoreService.upsert(pointId, vector, {
-      resourceId, // ← store original MongoDB id in payload for retrieval later
-      title: resource.title,
-      subject: resource.subject,
-      course: resource.course,
-      semester: resource.semester,
-      resourceType: resource.resourceType,
-      fileType: resource.fileType,
-    });
+    // 3. Embed all chunks in batch
+    const vectors = await this.embeddingService.embedBatch(
+      chunks.map((c) => c.text),
+    );
 
-    this.logger.log(`Ingestion complete for resource: ${resourceId}`);
+    // 4. Upsert all points to Qdrant
+    await this.vectorStoreService.upsertMany(
+      chunks.map((chunk, i) => ({
+        id: this.toUuid(`${resourceId}_${chunk.chunkIndex}`),
+        vector: vectors[i],
+        payload: {
+          resourceId,
+          chunkIndex: chunk.chunkIndex,
+          pageNumber: chunk.pageNumber,
+          text: chunk.text,
+          title: resource.title,
+          subject: resource.subject,
+          course: resource.course,
+          semester: resource.semester,
+          resourceType: resource.resourceType,
+          fileType: resource.fileType,
+        },
+      })),
+    );
+
+    this.logger.log(
+      `Ingestion complete for resource: ${resourceId} — ${chunks.length} vectors stored`,
+    );
   }
   private toUuid(mongoId: string): string {
     const hash = createHash('md5').update(mongoId).digest('hex');
