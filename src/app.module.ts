@@ -10,6 +10,7 @@ import { StorageModule } from './modules/storage/storage.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { PostModule } from './modules/post/post.module';
 import { AiModule } from './modules/ai/ai.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { AiModule } from './modules/ai/ai.module';
         uri: configService.get<string>("MONGO_URI_Local")
       })
     }),
+    EventEmitterModule.forRoot(),
     UserModule,
     AuthModule,
     ResourceModule,

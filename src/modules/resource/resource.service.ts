@@ -15,11 +15,13 @@ import { PaginatedResponse } from 'src/common/interfaces/paginated-response.inte
 import { buildResourceQuery } from './dto/queries/resource-query.builder';
 import { buildResourceSort } from './dto/queries/build-resource-sort';
 import { inferFileType } from './utils/file.utils';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class ResourceService {
   constructor(
     private readonly cloudinaryService: CloudinaryService,
+    private readonly eventEmitter: EventEmitter2,
     @InjectModel(Resource.name) private resourceModel: Model<ResourceDocument>,
   ) {}
 
@@ -202,6 +204,9 @@ export class ResourceService {
 
     if (!resource)
       throw new NotFoundException('Resource not found or not pending');
+
+    this.eventEmitter.emit("resource.approved",resource);
+
     return resource as Resource;
   }
 

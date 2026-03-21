@@ -8,8 +8,13 @@ import { EmbeddingService } from './services/embedding.service';
 import { VectorStoreService } from './services/vector-store.service';
 import { DocumentParserService } from './services/document-parser.service';
 import { ConversationService } from './services/conversation.service';
+import { IngestionService } from './services/ingestion.service';
+import { ResourceApprovedListener } from './listeners/resource-approved.listener';
 import aiConfig from './config/ai.config';
-import { ConversationSession, ConversationSessionSchema } from './schema/conversation-session.schema';
+import {
+  ConversationSession,
+  ConversationSessionSchema,
+} from './schema/conversation-session.schema';
 
 @Module({
   imports: [
@@ -22,10 +27,12 @@ import { ConversationSession, ConversationSessionSchema } from './schema/convers
   providers: [
     AiChatService,
     GroqService,
+    ConversationService,
+    IngestionService,
+    DocumentParserService,
     EmbeddingService,
     VectorStoreService,
-    DocumentParserService,
-    ConversationService,
+    ResourceApprovedListener,
   ],
   exports: [AiChatService],
 })
