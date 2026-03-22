@@ -2,6 +2,7 @@ import { IsOptional, IsEnum, IsNumber, IsString, Min, Max } from 'class-validato
 import { Type } from 'class-transformer';
 import { ResourceType } from '../enums/resource-types.enum';
 import { ResourceSort } from '../enums/resource-sort.enum';
+import { ApprovalStatus } from '../enums/approval-status.enum';
 
 export class ResourceQueryDto {
 
@@ -23,11 +24,18 @@ export class ResourceQueryDto {
   sort?: ResourceSort = ResourceSort.NEWEST;
 
   @IsOptional()
+  @IsEnum(ApprovalStatus)
+  status?: ApprovalStatus;
+
+  @IsOptional()
+  @IsString()
+  uploadedBy?: string;
+
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(1)
   page?: number = 1;
-
   @IsOptional()
   @Type(() => Number)
   @Max(50)

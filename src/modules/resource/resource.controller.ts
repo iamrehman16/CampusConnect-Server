@@ -10,6 +10,7 @@ import {
   Res,
   Req,
   Query,
+  Delete,
 } from '@nestjs/common';
 import * as express from 'express';
 import { ResourceService } from './resource.service';
@@ -24,6 +25,7 @@ import { Role } from '../auth/decorators/role.decorator';
 import { Roles } from '../user/enums/user-role.enum';
 import { ResourceQueryDto } from './dto/resource-query.dto';
 import { CurrentUser } from '../auth/types/current-user';
+import { ApprovalStatus } from './enums/approval-status.enum';
 
 @Controller('resources')
 export class ResourceController {
@@ -47,6 +49,18 @@ export class ResourceController {
   @Public()
   @Get()
   async findAll(@Query() query: ResourceQueryDto) {
+    // Force APPROVED status for the public endpoint to prevent access leaking
+    query.status = ApprovalStatus.APPROVED;
+    return this.resourceService.findAll(query);
+  }
+
+  @Get('my')
+  @Role(Roles.CONTRIBUTOR, Roles.ADMIN)
+  getMyResources(
+    @Query() query: ResourceQueryDto,
+    @Req() req: { user: CurrentUser },
+  ) {
+    query.uploadedBy = req.user.id;
     return this.resourceService.findAll(query);
   }
 
@@ -67,12 +81,21 @@ export class ResourceController {
   }
 
   @Patch(':id/my')
-  @Role(Roles.CONTRIBUTOR)
+  @Role(Roles.CONTRIBUTOR, Roles.ADMIN)
   updateOwn(
     @Param('id', ParseMongoIdPipe) id: string,
     @Body() dto: UpdateResourceByContributorDto,
-    @Req() req,
+    @Req() req: { user: CurrentUser },
   ) {
     return this.resourceService.updateOwn(id, dto, req.user.id);
+  }
+
+  @Delete(':id/my')
+  @Role(Roles.CONTRIBUTOR, Roles.ADMIN)
+  deleteOwn(
+    @Param('id', ParseMongoIdPipe) id: string,
+    @Req() req: { user: CurrentUser },
+  ) {
+    return this.resourceService.removeOwn(id, req.user.id);
   }
 }

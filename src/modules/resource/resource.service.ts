@@ -178,6 +178,37 @@ export class ResourceService {
     return { message: 'Resource deleted successfully' };
   }
 
+  async removeOwn(id: string, userId: string): Promise<{ message: string }> {
+    const resource = await this.resourceModel
+      .findOneAndUpdate(
+        { _id: id, uploadedBy: userId, isDeleted: false },
+        { isDeleted: true },
+        { new: false },
+      )
+      .lean()
+      .exec();
+
+    if (!resource) {
+      throw new NotFoundException('Resource not found or ownership mismatch');
+    }
+
+    if (resource.cloudinaryPublicId) {
+      this.cloudinaryService
+        .deleteFile(
+          resource.cloudinaryPublicId,
+          resource.cloudinaryResourceType as 'image' | 'video' | 'raw',
+        )
+        .catch((err) =>
+          console.error(
+            `Cleanup failed for ${resource.cloudinaryPublicId}:`,
+            err,
+          ),
+        );
+    }
+
+    return { message: 'Resource deleted successfully' };
+  }
+
   async getDownloadUrl(id: string): Promise<string> {
     const resource = await this.resourceModel
       .findOneAndUpdate(

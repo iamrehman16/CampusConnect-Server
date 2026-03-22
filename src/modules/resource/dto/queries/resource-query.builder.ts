@@ -2,15 +2,18 @@ import { QueryFilter } from 'mongoose';
 import { ResourceDocument } from '../../schemas/resource.schema';
 import { ResourceQueryDto } from '../resource-query.dto';
 import { ApprovalStatus } from '../../enums/approval-status.enum';
-
 export function buildResourceQuery(
   dto: ResourceQueryDto,
 ): QueryFilter<ResourceDocument> {
 
   const query: QueryFilter<ResourceDocument> = {
     isDeleted: false,
-    approvalStatus: ApprovalStatus.APPROVED,
+    approvalStatus: dto.status || ApprovalStatus.APPROVED,
   };
+
+  if (dto.uploadedBy) {
+    query.uploadedBy = dto.uploadedBy;
+  }
   if (dto.type) {
     query.resourceType = dto.type;
   }
