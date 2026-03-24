@@ -9,8 +9,9 @@ import { Model, Types, Connection } from 'mongoose';
 import { Post, PostDocument } from './schemas/post.schema';
 import { Comment, CommentDocument } from './schemas/comment.schema';
 import { CreatePostDto, UpdatePostDto } from './dto/post.dto';
-import { CreateCommentDto } from './dto/create-comment.dto';
+import { CreateCommentDto, UpdateCommentDto } from './dto/comment.dto';
 import { AdminUpdatePostDto } from './dto/admin-post.dto';
+import { error } from 'console';
 
 @Injectable()
 export class PostService {
@@ -20,7 +21,7 @@ export class PostService {
     @InjectConnection() private readonly connection: Connection,
   ) {}
 
-  async create(dto: CreatePostDto, userId: string): Promise<PostDocument> {
+  async createPost(dto: CreatePostDto, userId: string): Promise<PostDocument> {
     const post = new this.postModel({
       ...dto,
       author: new Types.ObjectId(userId),
@@ -28,7 +29,7 @@ export class PostService {
     return post.save();
   }
 
-  async findAll() {
+  async getAllPosts() {
     return this.postModel
       .find({ isDeleted: false })
       .populate('author', 'name email')
@@ -37,7 +38,7 @@ export class PostService {
       .exec();
   }
 
-  async findOne(id: string) {
+  async getPostById(id: string) {
     const post = await this.postModel
       .findOne({ _id: id, isDeleted: false })
       .populate('author', 'name email')
@@ -48,7 +49,7 @@ export class PostService {
     return post;
   }
 
-  async update(id: string, dto: UpdatePostDto, userId: string) {
+  async updatePost(id: string, dto: UpdatePostDto, userId: string) {
     const updatedPost = await this.postModel
       .findOneAndUpdate(
         { _id: id, author: new Types.ObjectId(userId), isDeleted: false },
@@ -64,7 +65,7 @@ export class PostService {
     return updatedPost;
   }
 
-  async softDelete(id: string, userId: string) {
+  async deletePost(id: string, userId: string) {
     const result = await this.postModel
       .findOneAndUpdate(
         { _id: id, author: new Types.ObjectId(userId), isDeleted: false },
@@ -80,11 +81,27 @@ export class PostService {
     return { success: true };
   }
 
-  async toggleUpvote(id: string, userId: string) {
+  async adminDeletePost(id: string) {
+    const result = await this.postModel
+      .findOneAndUpdate(
+        { _id: id, isDeleted: false },
+        { $set: { isDeleted: true } },
+        { new: true },
+      )
+      .lean()
+      .exec();
+
+    if (!result) {
+      throw new NotFoundException('Post is deleted or not found');
+    }
+
+    return { message: 'Post deleted successfully!' };
+  }
+
+  async togglePostUpvote(id: string, userId: string) {
     const uid = new Types.ObjectId(userId);
     const postId = new Types.ObjectId(id);
 
-    // Try to remove user from upvotes first
     let post = await this.postModel
       .findOneAndUpdate(
         { _id: postId, upvotes: uid, isDeleted: false },
@@ -94,7 +111,6 @@ export class PostService {
       .lean()
       .exec();
 
-    // If not found in upvotes, add user
     if (!post) {
       post = await this.postModel
         .findOneAndUpdate(
@@ -110,9 +126,11 @@ export class PostService {
     return post;
   }
 
-  async addComment(postId: string, dto: CreateCommentDto, userId: string) {
+  async createComment(postId: string, dto: CreateCommentDto, userId: string) {
     const session = await this.connection.startSession();
     session.startTransaction();
+
+    console.log(dto)
 
     try {
       const [comment] = await this.commentModel.create(
@@ -140,6 +158,7 @@ export class PostService {
       await session.commitTransaction();
       return comment;
     } catch (error) {
+      console.log(error);
       await session.abortTransaction();
       throw error instanceof NotFoundException
         ? error
@@ -149,7 +168,7 @@ export class PostService {
     }
   }
 
-  async findCommentsByPost(postId: string) {
+  async getCommentsByPostId(postId: string) {
     return this.commentModel
       .find({ postId: new Types.ObjectId(postId), isDeleted: false })
       .populate('author', 'name')
@@ -158,7 +177,7 @@ export class PostService {
       .exec();
   }
 
-  async adminUpdate(id: string, dto: AdminUpdatePostDto) {
+  async adminUpdatePost(id: string, dto: AdminUpdatePostDto) {
     const updatedPost = await this.postModel
       .findByIdAndUpdate(id, { $set: dto }, { new: true })
       .lean()
@@ -168,7 +187,7 @@ export class PostService {
     return updatedPost;
   }
 
-  async getStats() {
+  async getPostStats() {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
     const stats = await this.postModel.aggregate([
@@ -188,5 +207,139 @@ export class PostService {
       total: stats[0].total[0]?.count || 0,
       recent: stats[0].recent[0]?.count || 0,
     };
+  }
+
+  async updateComment(id: string, dto: UpdateCommentDto, userId: string) {
+    const updatedComment = await this.commentModel
+      .findOneAndUpdate(
+        {
+          _id: id,
+          author: new Types.ObjectId(userId),
+          isDeleted: false,
+        },
+        {
+          $set: dto,
+        },
+        {
+          new: true,
+        },
+      )
+      .lean()
+      .exec();
+
+    if (!updatedComment) {
+      throw new ForbiddenException('You are forbidden or comment not found!');
+    }
+
+    return updatedComment;
+  }
+
+  async deleteComment(id: string, userId: string) {
+    const session = await this.connection.startSession();
+    session.startTransaction();
+
+    try {
+      const deletedComment = await this.commentModel
+        .findOneAndUpdate(
+          {
+            _id: id,
+            author: new Types.ObjectId(userId),
+            isDeleted: false,
+          },
+          {
+            $set: { isDeleted: true },
+          },
+          {
+            session,
+            new: true,
+          },
+        )
+        .lean()
+        .exec();
+
+      if (!deletedComment) {
+        throw new ForbiddenException('You are forbidden or comment not found!');
+      }
+
+      await this.postModel.updateOne(
+        { _id: deletedComment.postId, isDeleted: false },
+        { $inc: { commentCount: -1 } },
+        { session },
+      );
+
+      await session.commitTransaction();
+      return { message: 'Comment deleted successfully!' };
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
+
+  async adminUpdateComment(id: string, dto: UpdateCommentDto) {
+    const updatedComment = await this.commentModel
+      .findOneAndUpdate(
+        {
+          _id: id,
+          isDeleted: false,
+        },
+        {
+          $set: dto,
+        },
+        {
+          new: true,
+        },
+      )
+      .lean()
+      .exec();
+
+    if (!updatedComment) {
+      throw new NotFoundException('Comment is deleted or not found!');
+    }
+
+    return updatedComment;
+  }
+
+  async adminDeleteComment(id: string) {
+    const session = await this.connection.startSession();
+    session.startTransaction();
+
+    try {
+      const deletedComment = await this.commentModel
+        .findOneAndUpdate(
+          {
+            _id: id,
+            isDeleted: false,
+          },
+          {
+            $set: { isDeleted: true },
+          },
+          {
+            session,
+            new: true,
+          },
+        )
+        .lean()
+        .exec();
+
+      if (!deletedComment) {
+        throw new NotFoundException('Comment is deleted or not found!');
+      }
+
+      await this.postModel.updateOne(
+        { _id: deletedComment.postId, isDeleted: false },
+        { $inc: { commentCount: -1 } },
+        { session },
+      );
+
+      await session.commitTransaction();
+      return { message: 'Comment deleted successfully!' };
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
   }
 }

@@ -15,7 +15,7 @@ export class DashboardService {
     const [userStats, resourceStats, postStats] = await Promise.all([
       this.userService.getStats(),
       this.resourceService.getStats(),
-      this.postService.getStats(),
+      this.postService.getPostStats(),
     ]);
 
     return {

@@ -10,63 +10,78 @@ import {
 } from '@nestjs/common';
 import { PostService } from './post.service';
 import { CreatePostDto, UpdatePostDto } from './dto/post.dto';
-import { CreateCommentDto } from './dto/create-comment.dto';
-import { Public } from '../auth/decorators/public.decorator';
+import { CreateCommentDto, UpdateCommentDto } from './dto/comment.dto';
 import { CurrentUser } from '../auth/types/current-user';
+import { Role } from '../auth/decorators/role.decorator';
+import { Roles } from '../user/enums/user-role.enum';
 
-@Public()
+@Role(Roles.CONTRIBUTOR, Roles.STUDENT,Roles.ADMIN)
 @Controller('posts')
 export class PostController {
   constructor(private readonly postService: PostService) {}
 
   @Post()
-  create(@Body() dto: CreatePostDto, @Req() req: { user: CurrentUser }) {
-    return this.postService.create(dto, req.user.id);
+  createPost(@Body() dto: CreatePostDto, @Req() req: { user: CurrentUser }) {
+    return this.postService.createPost(dto, req.user.id);
   }
 
-  @Public()
   @Get()
-  findAll() {
-    return this.postService.findAll();
+  getAllPosts() {
+    return this.postService.getAllPosts();
   }
 
-  @Public()
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.postService.findOne(id);
+  getPostById(@Param('id') id: string) {
+    return this.postService.getPostById(id);
   }
 
   @Patch(':id')
-  update(
+  updatePost(
     @Param('id') id: string,
     @Body() dto: UpdatePostDto,
     @Req() req: { user: CurrentUser },
   ) {
-    return this.postService.update(id, dto, req.user.id);
+    return this.postService.updatePost(id, dto, req.user.id);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string, @Req() req: { user: CurrentUser }) {
-    return this.postService.softDelete(id, req.user.id);
+  deletePost(@Param('id') id: string, @Req() req: { user: CurrentUser }) {
+    return this.postService.deletePost(id, req.user.id);
   }
 
   @Post(':id/upvote')
-  toggleUpvote(@Param('id') id: string, @Req() req: { user: CurrentUser }) {
-    return this.postService.toggleUpvote(id, req.user.id);
+  togglePostUpvote(@Param('id') id: string, @Req() req: { user: CurrentUser }) {
+    return this.postService.togglePostUpvote(id, req.user.id);
   }
 
   @Post(':id/comments')
-  addComment(
+  createComment(
     @Param('id') postId: string,
     @Body() dto: CreateCommentDto,
     @Req() req: { user: CurrentUser },
   ) {
-    return this.postService.addComment(postId, dto, req.user.id);
+    return this.postService.createComment(postId, dto, req.user.id);
   }
 
-  @Public()
   @Get(':id/comments')
-  findComments(@Param('id') id: string) {
-    return this.postService.findCommentsByPost(id);
+  getPostComments(@Param('id') id: string) {
+    return this.postService.getCommentsByPostId(id);
+  }
+
+  @Patch('comments/:commentId')
+  updateComment(
+    @Param('commentId') commentId: string,
+    @Body() dto: UpdateCommentDto,
+    @Req() req: { user: CurrentUser },
+  ) {
+    return this.postService.updateComment(commentId, dto, req.user.id);
+  }
+
+  @Delete('comments/:commentId')
+  deleteComment(
+    @Param('commentId') commentId: string,
+    @Req() req: { user: CurrentUser },
+  ) {
+    return this.postService.deleteComment(commentId, req.user.id);
   }
 }
