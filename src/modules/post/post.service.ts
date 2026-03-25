@@ -11,7 +11,11 @@ import { Comment, CommentDocument } from './schemas/comment.schema';
 import { CreatePostDto, UpdatePostDto } from './dto/post.dto';
 import { CreateCommentDto, UpdateCommentDto } from './dto/comment.dto';
 import { AdminUpdatePostDto } from './dto/admin-post.dto';
-import { error } from 'console';
+import { BaseQueryDto } from 'src/common/dto/base-query.dto';
+import {
+  PaginationService,
+  PaginatedResult,
+} from 'src/common/services/pagination.service';
 
 @Injectable()
 export class PostService {
@@ -19,6 +23,7 @@ export class PostService {
     @InjectModel(Post.name) private postModel: Model<PostDocument>,
     @InjectModel(Comment.name) private commentModel: Model<CommentDocument>,
     @InjectConnection() private readonly connection: Connection,
+    private readonly paginationService: PaginationService,
   ) {}
 
   async createPost(dto: CreatePostDto, userId: string): Promise<PostDocument> {
@@ -29,13 +34,14 @@ export class PostService {
     return post.save();
   }
 
-  async getAllPosts() {
-    return this.postModel
-      .find({ isDeleted: false })
-      .populate('author', 'name email')
-      .sort({ createdAt: -1 })
-      .lean()
-      .exec();
+  async getAllPosts(dto: BaseQueryDto): Promise<PaginatedResult<Post>> {
+    return this.paginationService.paginateWithPopulate(
+      this.postModel,
+      dto,
+      { build: () => ({ isDeleted: false }) },
+      { build: () => ({ createdAt: -1 }) },
+      { path: 'author', select: 'name email' },
+    );
   }
 
   async getPostById(id: string) {
@@ -62,6 +68,16 @@ export class PostService {
     if (!updatedPost) {
       throw new ForbiddenException('Post not found or unauthorized');
     }
+    return updatedPost;
+  }
+
+  async adminUpdatePost(id: string, dto: AdminUpdatePostDto) {
+    const updatedPost = await this.postModel
+      .findByIdAndUpdate(id, { $set: dto }, { new: true })
+      .lean()
+      .exec();
+
+    if (!updatedPost) throw new NotFoundException('Post not found');
     return updatedPost;
   }
 
@@ -130,8 +146,6 @@ export class PostService {
     const session = await this.connection.startSession();
     session.startTransaction();
 
-    console.log(dto)
-
     try {
       const [comment] = await this.commentModel.create(
         [
@@ -158,7 +172,6 @@ export class PostService {
       await session.commitTransaction();
       return comment;
     } catch (error) {
-      console.log(error);
       await session.abortTransaction();
       throw error instanceof NotFoundException
         ? error
@@ -168,23 +181,19 @@ export class PostService {
     }
   }
 
-  async getCommentsByPostId(postId: string) {
-    return this.commentModel
-      .find({ postId: new Types.ObjectId(postId), isDeleted: false })
-      .populate('author', 'name')
-      .sort({ createdAt: 1 })
-      .lean()
-      .exec();
-  }
-
-  async adminUpdatePost(id: string, dto: AdminUpdatePostDto) {
-    const updatedPost = await this.postModel
-      .findByIdAndUpdate(id, { $set: dto }, { new: true })
-      .lean()
-      .exec();
-
-    if (!updatedPost) throw new NotFoundException('Post not found');
-    return updatedPost;
+  async getCommentsByPostId(
+    postId: string,
+    dto: BaseQueryDto,
+  ): Promise<PaginatedResult<Comment>> {
+    return this.paginationService.paginateWithPopulate(
+      this.commentModel,
+      dto,
+      {
+        build: () => ({ postId: new Types.ObjectId(postId), isDeleted: false }),
+      },
+      { build: () => ({ createdAt: 1 }) },
+      { path: 'author', select: 'name' },
+    );
   }
 
   async getPostStats() {
@@ -217,12 +226,8 @@ export class PostService {
           author: new Types.ObjectId(userId),
           isDeleted: false,
         },
-        {
-          $set: dto,
-        },
-        {
-          new: true,
-        },
+        { $set: dto },
+        { new: true },
       )
       .lean()
       .exec();
@@ -246,13 +251,8 @@ export class PostService {
             author: new Types.ObjectId(userId),
             isDeleted: false,
           },
-          {
-            $set: { isDeleted: true },
-          },
-          {
-            session,
-            new: true,
-          },
+          { $set: { isDeleted: true } },
+          { session, new: true },
         )
         .lean()
         .exec();
@@ -280,16 +280,9 @@ export class PostService {
   async adminUpdateComment(id: string, dto: UpdateCommentDto) {
     const updatedComment = await this.commentModel
       .findOneAndUpdate(
-        {
-          _id: id,
-          isDeleted: false,
-        },
-        {
-          $set: dto,
-        },
-        {
-          new: true,
-        },
+        { _id: id, isDeleted: false },
+        { $set: dto },
+        { new: true },
       )
       .lean()
       .exec();
@@ -308,17 +301,9 @@ export class PostService {
     try {
       const deletedComment = await this.commentModel
         .findOneAndUpdate(
-          {
-            _id: id,
-            isDeleted: false,
-          },
-          {
-            $set: { isDeleted: true },
-          },
-          {
-            session,
-            new: true,
-          },
+          { _id: id, isDeleted: false },
+          { $set: { isDeleted: true } },
+          { session, new: true },
         )
         .lean()
         .exec();

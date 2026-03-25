@@ -11,16 +11,23 @@ import { CreateResourceByContributorDto } from './dto/create-resource-contributo
 import { UpdateResourceByContributorDto } from './dto/update-resource-contributor.dto';
 import { ApprovalStatus } from './enums/approval-status.enum';
 import { ResourceQueryDto } from './dto/resource-query.dto';
-import { PaginatedResponse } from 'src/common/interfaces/paginated-response.interface';
-import { buildResourceQuery } from './dto/queries/resource-query.builder';
-import { buildResourceSort } from './dto/queries/build-resource-sort';
+import { ResourceQueryBuilder } from './dto/queries/build-resource-query'
+import { ResourceSortBuilder } from './dto/queries/build-resource-sort';
+import {
+  PaginationService,
+  PaginatedResult,
+} from 'src/common/services/pagination.service';
 import { inferFileType } from './utils/file.utils';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class ResourceService {
+  private readonly queryBuilder = new ResourceQueryBuilder();
+  private readonly sortBuilder = new ResourceSortBuilder();
+
   constructor(
     private readonly cloudinaryService: CloudinaryService,
+    private readonly paginationService: PaginationService,
     private readonly eventEmitter: EventEmitter2,
     @InjectModel(Resource.name) private resourceModel: Model<ResourceDocument>,
   ) {}
@@ -29,7 +36,7 @@ export class ResourceService {
     dto: CreateResourceByContributorDto,
     file: Express.Multer.File,
     userId: string,
-  ): Promise<Resource> {
+  ){
     let uploadResult;
     try {
       uploadResult = await this.cloudinaryService.uploadFile(file);
@@ -71,39 +78,16 @@ export class ResourceService {
     }
   }
 
-  async findAll(
-    queryDto: ResourceQueryDto,
-  ): Promise<PaginatedResponse<Resource>> {
-    const mongoQuery = buildResourceQuery(queryDto);
-    const mongoSort = buildResourceSort(queryDto.sort);
-    const page = queryDto.page ?? 1;
-    const limit = queryDto.limit ?? 12;
-    const skip = (page - 1) * limit;
-
-    try {
-      const [data, total] = await Promise.all([
-        this.resourceModel
-          .find(mongoQuery)
-          .sort(mongoSort as any)
-          .skip(skip)
-          .limit(limit)
-          .lean()
-          .exec(),
-        this.resourceModel.countDocuments(mongoQuery),
-      ]);
-
-      return {
-        data: data as Resource[],
-        total,
-        page,
-        limit,
-      };
-    } catch {
-      throw new InternalServerErrorException('Failed to fetch resources');
-    }
+  async findAll(dto: ResourceQueryDto) {
+    return this.paginationService.paginate(
+      this.resourceModel,
+      dto,
+      this.queryBuilder,
+      this.sortBuilder,
+    );
   }
 
-  async findOne(id: string): Promise<Resource> {
+  async findOne(id: string){
     const resource = await this.resourceModel
       .findOne({ _id: id, isDeleted: false })
       .lean()
@@ -116,7 +100,7 @@ export class ResourceService {
   async update(
     id: string,
     dto: UpdateResourceByContributorDto,
-  ): Promise<Resource> {
+  ){
     const resource = await this.resourceModel
       .findOneAndUpdate({ _id: id, isDeleted: false }, dto, { new: true })
       .lean()
@@ -130,7 +114,7 @@ export class ResourceService {
     id: string,
     dto: UpdateResourceByContributorDto,
     userId: string,
-  ): Promise<Resource> {
+  ){
     const resource = await this.resourceModel
       .findOneAndUpdate(
         { _id: id, uploadedBy: userId, isDeleted: false },
@@ -147,7 +131,7 @@ export class ResourceService {
     return resource as Resource;
   }
 
-  async remove(id: string): Promise<{ message: string }> {
+  async remove(id: string){
     const resource = await this.resourceModel
       .findOneAndUpdate(
         { _id: id, isDeleted: false },
@@ -178,7 +162,7 @@ export class ResourceService {
     return { message: 'Resource deleted successfully' };
   }
 
-  async removeOwn(id: string, userId: string): Promise<{ message: string }> {
+  async removeOwn(id: string, userId: string){
     const resource = await this.resourceModel
       .findOneAndUpdate(
         { _id: id, uploadedBy: userId, isDeleted: false },
@@ -209,7 +193,7 @@ export class ResourceService {
     return { message: 'Resource deleted successfully' };
   }
 
-  async getDownloadUrl(id: string): Promise<string> {
+  async getDownloadUrl(id: string) {
     const resource = await this.resourceModel
       .findOneAndUpdate(
         { _id: id, isDeleted: false },
@@ -223,7 +207,7 @@ export class ResourceService {
     return this.cloudinaryService.generateDownloadUrl(resource.fileUrl);
   }
 
-  async approve(id: string): Promise<Resource> {
+  async approve(id: string){
     const resource = await this.resourceModel
       .findOneAndUpdate(
         { _id: id, isDeleted: false, approvalStatus: ApprovalStatus.PENDING },
@@ -236,12 +220,12 @@ export class ResourceService {
     if (!resource)
       throw new NotFoundException('Resource not found or not pending');
 
-    this.eventEmitter.emit("resource.approved",resource);
+    this.eventEmitter.emit('resource.approved', resource);
 
     return resource as Resource;
   }
 
-  async reject(id: string, reason: string): Promise<Resource> {
+  async reject(id: string, reason: string){
     const resource = await this.resourceModel
       .findOneAndUpdate(
         { _id: id, isDeleted: false, approvalStatus: ApprovalStatus.PENDING },

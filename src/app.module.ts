@@ -11,6 +11,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { PostModule } from './modules/post/post.module';
 import { AiModule } from './modules/ai/ai.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { CommonModule } from './common/common.module';
 
 @Module({
   imports: [
@@ -30,7 +31,8 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     StorageModule,
     DashboardModule,
     PostModule,
-    AiModule
+    AiModule,
+    CommonModule
   ],
   controllers: [AppController],
   providers: [AppService],

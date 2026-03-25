@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   Req,
+  Query,
 } from '@nestjs/common';
 import { PostService } from './post.service';
 import { CreatePostDto, UpdatePostDto } from './dto/post.dto';
@@ -14,6 +15,7 @@ import { CreateCommentDto, UpdateCommentDto } from './dto/comment.dto';
 import { CurrentUser } from '../auth/types/current-user';
 import { Role } from '../auth/decorators/role.decorator';
 import { Roles } from '../user/enums/user-role.enum';
+import { BaseQueryDto } from 'src/common/dto/base-query.dto';
 
 @Role(Roles.CONTRIBUTOR, Roles.STUDENT,Roles.ADMIN)
 @Controller('posts')
@@ -26,8 +28,10 @@ export class PostController {
   }
 
   @Get()
-  getAllPosts() {
-    return this.postService.getAllPosts();
+  getAllPosts(
+     @Query() dto: BaseQueryDto
+  ) {
+    return this.postService.getAllPosts(dto);
   }
 
   @Get(':id')
@@ -64,8 +68,8 @@ export class PostController {
   }
 
   @Get(':id/comments')
-  getPostComments(@Param('id') id: string) {
-    return this.postService.getCommentsByPostId(id);
+  getPostComments(@Param('id') id: string, @Query() dto: BaseQueryDto) {
+    return this.postService.getCommentsByPostId(id, dto);
   }
 
   @Patch('comments/:commentId')
