@@ -27,6 +27,9 @@ export class Message {
 
   @Prop({ type: Boolean, default: false })
   isDeleted: boolean;
+
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export const MessageSchema = SchemaFactory.createForClass(Message);

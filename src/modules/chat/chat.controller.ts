@@ -1,34 +1,41 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { ChatService } from './chat.service';
-import { CreateChatDto } from './dto/create-chat.dto';
-import { UpdateChatDto } from './dto/update-chat.dto';
+import { StartConversationDto } from './dto/start-conversation.dto';
+import { BaseQueryDto } from 'src/common/dto/base-query.dto';
+import { CurrentUser } from '../auth/types/current-user';
 
-@Controller('chat')
+@Controller('conversations')
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 
   @Post()
-  create(@Body() createChatDto: CreateChatDto) {
-    return this.chatService.create(createChatDto);
+  findOrCreate(
+    @Req() req: { user: CurrentUser },
+    @Body() dto: StartConversationDto,
+  ) {
+    return this.chatService.findOrCreateConversation(req.user.id, dto);
   }
 
   @Get()
-  findAll() {
-    return this.chatService.findAll();
+  getMyConversations(@Req() req: { user: CurrentUser }) {
+    return this.chatService.getUserConversations(req.user.id);
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.chatService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateChatDto: UpdateChatDto) {
-    return this.chatService.update(+id, updateChatDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.chatService.remove(+id);
+  @Get(':id/messages')
+  getMessages(
+    @Param('id') conversationId: string,
+    @Req() req: { user: CurrentUser },
+    @Query() dto: BaseQueryDto,
+  ) {
+    return this.chatService.getMessages(conversationId, req.user.id, dto);
   }
 }

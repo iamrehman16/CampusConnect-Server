@@ -17,6 +17,10 @@ export class Conversation {
 
   @Prop({ type: Date, default: null })
   lastMessageAt: Date | null;
+
+  createdAt: Date;
+  updatedAt: Date;
+
 }
 
 export const ConversationSchema = SchemaFactory.createForClass(Conversation);
