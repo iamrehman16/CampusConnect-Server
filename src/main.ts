@@ -11,8 +11,7 @@ async function bootstrap() {
 
   //setting up cors
   app.enableCors({
-    origin: true, // Allow all origins for testing
-    credentials: true,
+    origin: '*'
   })
 
   //global validation pipes
