@@ -23,3 +23,8 @@ export class UpdatePostDto {
   @MaxLength(5000)
   content?: string;
 }
+
+export class PostStats{
+  total:number = 0;
+  recent:number = 0;
+}

@@ -8,7 +8,7 @@ import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Model, Types, Connection } from 'mongoose';
 import { Post, PostDocument } from './schemas/post.schema';
 import { Comment, CommentDocument } from './schemas/comment.schema';
-import { CreatePostDto, UpdatePostDto } from './dto/post.dto';
+import { CreatePostDto, PostStats, UpdatePostDto } from './dto/post.dto';
 import { CreateCommentDto, UpdateCommentDto } from './dto/comment.dto';
 import { AdminUpdatePostDto } from './dto/admin-post.dto';
 import { BaseQueryDto } from 'src/common/dto/base-query.dto';
@@ -16,6 +16,7 @@ import {
   PaginationService,
   PaginatedResult,
 } from 'src/common/services/pagination.service';
+import { Roles } from '../user/enums/user-role.enum';
 
 @Injectable()
 export class PostService {
@@ -26,12 +27,19 @@ export class PostService {
     private readonly paginationService: PaginationService,
   ) {}
 
-  async createPost(dto: CreatePostDto, userId: string): Promise<PostDocument> {
+  async createPost(dto: CreatePostDto, userId: string) {
     const post = new this.postModel({
       ...dto,
       author: new Types.ObjectId(userId),
     });
-    return post.save();
+    const savedPost = await post.save();
+
+    const populatedPost = await savedPost.populate({
+      path: 'author',
+      select: 'name email',
+    });
+
+    return populatedPost.toObject();
   }
 
   async getAllPosts(dto: BaseQueryDto): Promise<PaginatedResult<Post>> {
@@ -55,13 +63,25 @@ export class PostService {
     return post;
   }
 
-  async updatePost(id: string, dto: UpdatePostDto, userId: string) {
+  async updatePost(
+    id: string,
+    dto: UpdatePostDto,
+    userId: string,
+    userRole: string,
+  ) {
+    const isAdmin = userRole === Roles.ADMIN;
+
     const updatedPost = await this.postModel
       .findOneAndUpdate(
-        { _id: id, author: new Types.ObjectId(userId), isDeleted: false },
+        {
+          _id: id,
+          ...(isAdmin ? {} : { author: new Types.ObjectId(userId) }),
+          isDeleted: false,
+        },
         { $set: dto },
         { new: true },
       )
+      .populate('author', 'name email')
       .lean()
       .exec();
 
@@ -74,6 +94,7 @@ export class PostService {
   async adminUpdatePost(id: string, dto: AdminUpdatePostDto) {
     const updatedPost = await this.postModel
       .findByIdAndUpdate(id, { $set: dto }, { new: true })
+      .populate('author', 'name email')
       .lean()
       .exec();
 
@@ -81,20 +102,27 @@ export class PostService {
     return updatedPost;
   }
 
-  async deletePost(id: string, userId: string) {
+  async deletePost(id: string, userId: string, userRole: string) {
+    const isAdmin = userRole === Roles.ADMIN;
+
     const result = await this.postModel
       .findOneAndUpdate(
-        { _id: id, author: new Types.ObjectId(userId), isDeleted: false },
+        {
+          _id: id,
+          ...(isAdmin ? {} : { author: new Types.ObjectId(userId) }),
+          isDeleted: false,
+        },
         { $set: { isDeleted: true } },
         { new: true },
       )
+      .populate('author', 'name email')
       .lean()
       .exec();
 
     if (!result) {
       throw new ForbiddenException('Post not found or unauthorized');
     }
-    return { success: true };
+    return result;
   }
 
   async adminDeletePost(id: string) {
@@ -104,6 +132,7 @@ export class PostService {
         { $set: { isDeleted: true } },
         { new: true },
       )
+      .populate('author', 'name email')
       .lean()
       .exec();
 
@@ -111,7 +140,7 @@ export class PostService {
       throw new NotFoundException('Post is deleted or not found');
     }
 
-    return { message: 'Post deleted successfully!' };
+    return result;
   }
 
   async togglePostUpvote(id: string, userId: string) {
@@ -124,6 +153,7 @@ export class PostService {
         { $pull: { upvotes: uid } },
         { new: true },
       )
+      .populate('author', 'name email')
       .lean()
       .exec();
 
@@ -134,6 +164,7 @@ export class PostService {
           { $addToSet: { upvotes: uid } },
           { new: true },
         )
+        .populate('author', 'name email')
         .lean()
         .exec();
     }
@@ -158,6 +189,8 @@ export class PostService {
         { session },
       );
 
+      const populatedComment = await comment.populate('author', 'name');
+
       const post = await this.postModel
         .findOneAndUpdate(
           { _id: postId, isDeleted: false },
@@ -170,7 +203,7 @@ export class PostService {
       if (!post) throw new NotFoundException('Post not found');
 
       await session.commitTransaction();
-      return comment;
+      return populatedComment.toObject();
     } catch (error) {
       await session.abortTransaction();
       throw error instanceof NotFoundException
@@ -212,23 +245,33 @@ export class PostService {
       },
     ]);
 
-    return {
+    const postStats: PostStats = {
       total: stats[0].total[0]?.count || 0,
       recent: stats[0].recent[0]?.count || 0,
     };
+
+    return postStats;
   }
 
-  async updateComment(id: string, dto: UpdateCommentDto, userId: string) {
+  async updateComment(
+    id: string,
+    dto: UpdateCommentDto,
+    userId: string,
+    userRole: String,
+  ) {
+    const isAdmin = userRole === Roles.ADMIN;
+
     const updatedComment = await this.commentModel
       .findOneAndUpdate(
         {
           _id: id,
-          author: new Types.ObjectId(userId),
+          ...(isAdmin ? {} : { author: new Types.ObjectId(userId) }),
           isDeleted: false,
         },
         { $set: dto },
         { new: true },
       )
+      .populate('author', 'name')
       .lean()
       .exec();
 
@@ -239,7 +282,9 @@ export class PostService {
     return updatedComment;
   }
 
-  async deleteComment(id: string, userId: string) {
+  async deleteComment(id: string, userId: string, userRole: string) {
+    const isAdmin = userRole === Roles.ADMIN;
+
     const session = await this.connection.startSession();
     session.startTransaction();
 
@@ -248,12 +293,13 @@ export class PostService {
         .findOneAndUpdate(
           {
             _id: id,
-            author: new Types.ObjectId(userId),
+            ...(isAdmin ? {} : { author: new Types.ObjectId(userId) }),
             isDeleted: false,
           },
           { $set: { isDeleted: true } },
           { session, new: true },
         )
+        .populate('author', 'name')
         .lean()
         .exec();
 
@@ -268,7 +314,7 @@ export class PostService {
       );
 
       await session.commitTransaction();
-      return { message: 'Comment deleted successfully!' };
+      return deletedComment;
     } catch (error) {
       await session.abortTransaction();
       throw error;
@@ -284,7 +330,9 @@ export class PostService {
         { $set: dto },
         { new: true },
       )
+      .populate('author', 'name')
       .lean()
+      .populate('author', 'name')
       .exec();
 
     if (!updatedComment) {
@@ -305,6 +353,7 @@ export class PostService {
           { $set: { isDeleted: true } },
           { session, new: true },
         )
+        .populate('author', 'name')
         .lean()
         .exec();
 
@@ -319,7 +368,7 @@ export class PostService {
       );
 
       await session.commitTransaction();
-      return { message: 'Comment deleted successfully!' };
+      return deletedComment;
     } catch (error) {
       await session.abortTransaction();
       throw error;

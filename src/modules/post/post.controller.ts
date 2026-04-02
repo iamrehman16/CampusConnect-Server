@@ -45,12 +45,12 @@ export class PostController {
     @Body() dto: UpdatePostDto,
     @Req() req: { user: CurrentUser },
   ) {
-    return this.postService.updatePost(id, dto, req.user.id);
+    return this.postService.updatePost(id, dto, req.user.id, req.user.role);
   }
 
   @Delete(':id')
   deletePost(@Param('id') id: string, @Req() req: { user: CurrentUser }) {
-    return this.postService.deletePost(id, req.user.id);
+    return this.postService.deletePost(id, req.user.id,req.user.role);
   }
 
   @Post(':id/upvote')
@@ -78,7 +78,7 @@ export class PostController {
     @Body() dto: UpdateCommentDto,
     @Req() req: { user: CurrentUser },
   ) {
-    return this.postService.updateComment(commentId, dto, req.user.id);
+    return this.postService.updateComment(commentId, dto, req.user.id, req.user.role);
   }
 
   @Delete('comments/:commentId')
@@ -86,6 +86,12 @@ export class PostController {
     @Param('commentId') commentId: string,
     @Req() req: { user: CurrentUser },
   ) {
-    return this.postService.deleteComment(commentId, req.user.id);
+    return this.postService.deleteComment(commentId, req.user.id, req.user.role);
   }
+
+  @Get('stats')
+  getPostStats(){
+    return this.postService.getPostStats();
+  }
+
 }
