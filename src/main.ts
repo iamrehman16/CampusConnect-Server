@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import dotenv from 'dotenv'
 import { ValidationPipe } from '@nestjs/common';
+import { GlobalHttpExceptionFilter } from './common/filters/http-exception.filter';
 dotenv.config();
 
 
@@ -24,6 +25,9 @@ async function bootstrap() {
       enableImplicitConversion: true,
     },
   }))
+
+  // global filters
+  app.useGlobalFilters(new GlobalHttpExceptionFilter());
 
   //set common prefix
   app.setGlobalPrefix('api');
