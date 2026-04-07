@@ -5,17 +5,17 @@ import {
   Body,
   Patch,
   Param,
+  Delete,
   UseInterceptors,
   UploadedFile,
   Res,
   Req,
   Query,
-  Delete,
 } from '@nestjs/common';
 import * as express from 'express';
 import { ResourceService } from './resource.service';
-import { CreateResourceByContributorDto } from './dto/create-resource-contributor.dto';
-import { UpdateResourceByContributorDto } from './dto/update-resource-contributor.dto';
+import { CreateResourceByContributorDto } from './dto/create-resource.dto';
+import { UpdateResourceByContributorDto } from './dto/update-resource.dto';
 import { Public } from '../auth/decorators/public.decorator';
 import { ParseMongoIdPipe } from 'src/common/pipes/is-mongo-id.pipe';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -33,23 +33,18 @@ export class ResourceController {
 
   @Role(Roles.ADMIN, Roles.CONTRIBUTOR)
   @Post()
-  @UseInterceptors(
-    FileInterceptor('file', {
-      storage: memoryStorage(),
-    }),
-  )
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   create(
     @UploadedFile(FileValidationPipe) file: Express.Multer.File,
     @Body() dto: CreateResourceByContributorDto,
-    @Req() req: { user: CurrentUser }
+    @Req() req: { user: CurrentUser },
   ) {
     return this.resourceService.create(dto, file, req.user.id);
   }
 
   @Public()
   @Get()
-  async findAll(@Query() query: ResourceQueryDto) {
-    // Force APPROVED status for the public endpoint to prevent access leaking
+  findAll(@Query() query: ResourceQueryDto) {
     query.status = ApprovalStatus.APPROVED;
     return this.resourceService.findAll(query);
   }
@@ -77,25 +72,27 @@ export class ResourceController {
     @Res() res: express.Response,
   ) {
     const url = await this.resourceService.getDownloadUrl(id);
-    return res.redirect(url);
+    return res.json({ url });       // was missing res.json — bare return won't send with @Res()
   }
 
-  @Patch(':id/my')
+  @Patch(':id')
   @Role(Roles.CONTRIBUTOR, Roles.ADMIN)
-  updateOwn(
+  update(
     @Param('id', ParseMongoIdPipe) id: string,
     @Body() dto: UpdateResourceByContributorDto,
     @Req() req: { user: CurrentUser },
   ) {
-    return this.resourceService.updateOwn(id, dto, req.user.id);
+    const isAdmin = req.user.role === Roles.ADMIN;
+    return this.resourceService.update(id, dto, req.user.id, isAdmin);
   }
 
-  @Delete(':id/my')
+  @Delete(':id')
   @Role(Roles.CONTRIBUTOR, Roles.ADMIN)
-  deleteOwn(
+  remove(
     @Param('id', ParseMongoIdPipe) id: string,
     @Req() req: { user: CurrentUser },
   ) {
-    return this.resourceService.removeOwn(id, req.user.id);
+    const isAdmin = req.user.role === Roles.ADMIN;
+    return this.resourceService.remove(id, req.user.id, isAdmin);
   }
 }

@@ -6,12 +6,12 @@ import {
 import { CloudinaryService } from '../storage/cloudinary.service';
 import { InjectModel } from '@nestjs/mongoose';
 import { Resource, ResourceDocument } from './schemas/resource.schema';
-import { Model } from 'mongoose';
-import { CreateResourceByContributorDto } from './dto/create-resource-contributor.dto';
-import { UpdateResourceByContributorDto } from './dto/update-resource-contributor.dto';
+import { Model, Types } from 'mongoose';
+import { CreateResourceByContributorDto } from './dto/create-resource.dto';
+import { UpdateResourceByContributorDto } from './dto/update-resource.dto';
 import { ApprovalStatus } from './enums/approval-status.enum';
 import { ResourceQueryDto } from './dto/resource-query.dto';
-import { ResourceQueryBuilder } from './dto/queries/build-resource-query'
+import { ResourceQueryBuilder } from './dto/queries/build-resource-query';
 import { ResourceSortBuilder } from './dto/queries/build-resource-sort';
 import {
   PaginationService,
@@ -19,6 +19,9 @@ import {
 } from 'src/common/services/pagination.service';
 import { inferFileType } from './utils/file.utils';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { AdminResourceQueryDto } from './dto/admin-resource-query.dto';
+
+const UPLOADED_BY_POPULATE = { path: 'uploadedBy', select: 'name email' };
 
 @Injectable()
 export class ResourceService {
@@ -36,11 +39,11 @@ export class ResourceService {
     dto: CreateResourceByContributorDto,
     file: Express.Multer.File,
     userId: string,
-  ){
+  ) {
     let uploadResult;
     try {
       uploadResult = await this.cloudinaryService.uploadFile(file);
-    } catch (err) {
+    } catch {
       throw new InternalServerErrorException('Upload to storage failed');
     }
 
@@ -63,10 +66,13 @@ export class ResourceService {
         uploadedBy: userId,
       });
 
-      return resource.toObject();
+      return this.resourceModel
+        .findById(resource._id)
+        .populate(UPLOADED_BY_POPULATE)
+        .lean()
+        .exec();
     } catch (err) {
-      console.log('The error is', err);
-
+      console.error('DB save failed:', err);
       if (uploadResult?.publicId) {
         await this.cloudinaryService
           .deleteFile(uploadResult.publicId, uploadResult.resourceType)
@@ -78,72 +84,69 @@ export class ResourceService {
     }
   }
 
-  async findAll(dto: ResourceQueryDto) {
-    return this.paginationService.paginate(
+  async findAll(dto: ResourceQueryDto): Promise<PaginatedResult<Resource>> {
+    return this.paginationService.paginateWithPopulate(
       this.resourceModel,
       dto,
       this.queryBuilder,
       this.sortBuilder,
+      UPLOADED_BY_POPULATE,
     );
   }
 
-  async findOne(id: string){
+  async findOne(id: string) {
     const resource = await this.resourceModel
       .findOne({ _id: id, isDeleted: false })
+      .populate(UPLOADED_BY_POPULATE)
       .lean()
       .exec();
 
     if (!resource) throw new NotFoundException('Resource not found');
-    return resource as Resource;
+    return resource;
   }
 
   async update(
     id: string,
     dto: UpdateResourceByContributorDto,
-  ){
-    const resource = await this.resourceModel
-      .findOneAndUpdate({ _id: id, isDeleted: false }, dto, { new: true })
-      .lean()
-      .exec();
-
-    if (!resource) throw new NotFoundException('Resource not found');
-    return resource as Resource;
-  }
-
-  async updateOwn(
-    id: string,
-    dto: UpdateResourceByContributorDto,
     userId: string,
-  ){
+    isAdmin: boolean,
+  ) {
+    const ownershipFilter = isAdmin
+      ? {}
+      : { uploadedBy: new Types.ObjectId(userId) };
+
     const resource = await this.resourceModel
       .findOneAndUpdate(
-        { _id: id, uploadedBy: userId, isDeleted: false },
-        dto,
+        { _id: id, ...ownershipFilter, isDeleted: false },
+        { $set: dto },
         { new: true, runValidators: true },
       )
+      .populate(UPLOADED_BY_POPULATE)
       .lean()
       .exec();
 
-    if (!resource) {
+    if (!resource)
       throw new NotFoundException('Resource not found or ownership mismatch');
-    }
-
-    return resource as Resource;
+    return resource;
   }
 
-  async remove(id: string){
+  async remove(id: string, userId: string, isAdmin: boolean) {
+    const ownershipFilter = isAdmin
+      ? {}
+      : { uploadedBy: new Types.ObjectId(userId) };
+
     const resource = await this.resourceModel
       .findOneAndUpdate(
-        { _id: id, isDeleted: false },
-        { isDeleted: true },
+        { _id: id, ...ownershipFilter, isDeleted: false },
+        { $set: { isDeleted: true } },
         { new: false },
       )
+      .populate(UPLOADED_BY_POPULATE)
       .lean()
       .exec();
 
-    if (!resource) {
-      throw new NotFoundException('Resource not found or already deleted');
-    }
+    if (!resource)
+      throw new NotFoundException('Resource not found or ownership mismatch');
 
     if (resource.cloudinaryPublicId) {
       this.cloudinaryService
@@ -159,38 +162,7 @@ export class ResourceService {
         );
     }
 
-    return { message: 'Resource deleted successfully' };
-  }
-
-  async removeOwn(id: string, userId: string){
-    const resource = await this.resourceModel
-      .findOneAndUpdate(
-        { _id: id, uploadedBy: userId, isDeleted: false },
-        { isDeleted: true },
-        { new: false },
-      )
-      .lean()
-      .exec();
-
-    if (!resource) {
-      throw new NotFoundException('Resource not found or ownership mismatch');
-    }
-
-    if (resource.cloudinaryPublicId) {
-      this.cloudinaryService
-        .deleteFile(
-          resource.cloudinaryPublicId,
-          resource.cloudinaryResourceType as 'image' | 'video' | 'raw',
-        )
-        .catch((err) =>
-          console.error(
-            `Cleanup failed for ${resource.cloudinaryPublicId}:`,
-            err,
-          ),
-        );
-    }
-
-    return { message: 'Resource deleted successfully' };
+    return resource;
   }
 
   async getDownloadUrl(id: string) {
@@ -207,13 +179,26 @@ export class ResourceService {
     return this.cloudinaryService.generateDownloadUrl(resource.fileUrl);
   }
 
-  async approve(id: string){
+  async findAllPending(
+    dto: AdminResourceQueryDto,
+  ): Promise<PaginatedResult<Resource>> {
+    return this.paginationService.paginateWithPopulate(
+      this.resourceModel,
+      { ...dto },
+      this.queryBuilder,
+      this.sortBuilder,
+      UPLOADED_BY_POPULATE,
+    );
+  }
+
+  async approve(id: string) {
     const resource = await this.resourceModel
       .findOneAndUpdate(
         { _id: id, isDeleted: false, approvalStatus: ApprovalStatus.PENDING },
         { approvalStatus: ApprovalStatus.APPROVED },
         { new: true },
       )
+      .populate(UPLOADED_BY_POPULATE)
       .lean()
       .exec();
 
@@ -221,23 +206,23 @@ export class ResourceService {
       throw new NotFoundException('Resource not found or not pending');
 
     this.eventEmitter.emit('resource.approved', resource);
-
-    return resource as Resource;
+    return resource;
   }
 
-  async reject(id: string, reason: string){
+  async reject(id: string, reason: string) {
     const resource = await this.resourceModel
       .findOneAndUpdate(
         { _id: id, isDeleted: false, approvalStatus: ApprovalStatus.PENDING },
         { approvalStatus: ApprovalStatus.REJECTED, rejectionReason: reason },
         { new: true },
       )
+      .populate(UPLOADED_BY_POPULATE)
       .lean()
       .exec();
 
     if (!resource)
       throw new NotFoundException('Resource not found or not pending');
-    return resource as Resource;
+    return resource;
   }
 
   async getStats() {
@@ -269,7 +254,7 @@ export class ResourceService {
         },
       ]);
 
-      return stats || { total: 0, pending: 0, uploadedPastWeek: 0 };
+      return stats ?? { total: 0, pending: 0, uploadedPastWeek: 0 };
     } catch {
       throw new InternalServerErrorException('Failed to fetch resource stats');
     }
