@@ -5,6 +5,9 @@ import dotenv from 'dotenv'
 import { ValidationPipe } from '@nestjs/common';
 import { GlobalHttpExceptionFilter } from './common/filters/http-exception.filter';
 dotenv.config();
+import mongoose from 'mongoose';
+
+mongoose.set('debug', true);
 
 
 async function bootstrap() {
