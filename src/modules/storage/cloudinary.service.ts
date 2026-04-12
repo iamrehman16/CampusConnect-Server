@@ -8,61 +8,24 @@ import { v2 as cloudinarySDK } from 'cloudinary';
 import { CloudinaryUploadResultDto } from './dto/cloudinary-upload-result';
 import { CLOUDINARY_CONFIG_KEY } from './config/cloudinary.config';
 import { inferCloudinaryResourceType } from '../resource/utils/file.utils';
+import {ConfigType } from '@nestjs/config';
+import resourceConfig from './config/cloudinary.config'
 
 @Injectable()
 export class CloudinaryService {
   constructor(
     @Inject(CLOUDINARY_CONFIG_KEY)
     private readonly cloudinary: typeof cloudinarySDK,
+    @Inject(resourceConfig.KEY)
+    private resourceCfg: ConfigType<typeof resourceConfig>,
   ) {}
 
-  async uploadFile(
-    file: Express.Multer.File,
-  ): Promise<CloudinaryUploadResultDto> {
-    try {
-      const resourceType = inferCloudinaryResourceType(file.mimetype);
 
-      const originalName = file.originalname;
-      const ext = originalName.split('.').pop()?.toLowerCase();
-      const baseName = originalName.replace(/\.[^/.]+$/, '');
-
-      const result = await new Promise<any>((resolve, reject) => {
-        const uploadStream = this.cloudinary.uploader.upload_stream(
-          {
-            resource_type: resourceType,
-            use_filename: true,
-            unique_filename: true,
-            filename_override: originalName,
-            ...(resourceType === 'raw' && {
-              public_id: `${baseName}_${Date.now()}.${ext}`,
-            }),
-          },
-          (error, result) => {
-            if (error) return reject(error);
-            resolve(result);
-          },
-        );
-        uploadStream.end(file.buffer);
-      });
-
-      const resolvedResourceType = (
-        ['image', 'video', 'raw'].includes(result.resource_type)
-          ? result.resource_type
-          : 'raw'
-      ) as 'image' | 'video' | 'raw';
-
-      return {
-        url: result.secure_url,
-        publicId: result.public_id,
-        format: result.format,
-        bytes: result.bytes,
-        resourceType: resolvedResourceType,
-      };
-    } catch (error) {
-      throw new InternalServerErrorException(
-        'Failed to upload file to Cloudinary',
-      );
-    }
+  generateSignature(paramsToSign: Record<string, string | number>): string {
+    return this.cloudinary.utils.api_sign_request(
+      paramsToSign,
+      this.resourceCfg.apiSecret,
+    );
   }
   generateDownloadUrl(secureUrl: string): string {
     if (!secureUrl?.includes('/upload/')) {
@@ -72,7 +35,7 @@ export class CloudinaryService {
   }
   async deleteFile(
     publicId: string,
-    resourceType: 'image' | 'video' | 'raw' = 'raw',
+    resourceType: 'image' | 'raw' = 'raw',
   ): Promise<void> {
     try {
       await this.cloudinary.uploader.destroy(publicId, {

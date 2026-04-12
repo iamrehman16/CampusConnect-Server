@@ -2,9 +2,8 @@ import { FileType } from '../enums/file-type.enum';
 
 export function inferCloudinaryResourceType(
   mimetype: string,
-): 'image' | 'video' | 'raw' {
+): 'image' | 'raw' {
   if (mimetype.startsWith('image/')) return 'image';
-  if (mimetype.startsWith('video/')) return 'video';
   if (mimetype === 'application/pdf') return 'image';
   return 'raw';
 }

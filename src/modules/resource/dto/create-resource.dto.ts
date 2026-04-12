@@ -1,54 +1,65 @@
 import {
-  IsString,
-  IsNotEmpty,
-  IsOptional,
-  IsEnum,
-  IsArray,
-  MaxLength,
-  IsInt,
-  Min,
-  Max,
+  IsString, IsNumber, IsIn, IsEnum,
+  MaxLength, Min, Max, IsArray, IsOptional,
 } from 'class-validator';
-
-import { Transform, Type } from 'class-transformer';
+import { Type } from 'class-transformer';
 import { ResourceType } from '../enums/resource-types.enum';
 
-export class CreateResourceByContributorDto {
-
+export class CreateResourceDto {
+  // --- Academic metadata (user fills in form) ---
   @IsString()
-  @IsNotEmpty()
   @MaxLength(200)
   title: string;
 
   @IsString()
-  @IsOptional()
   @MaxLength(2000)
+  @IsOptional()
   description?: string;
 
   @IsString()
-  @IsNotEmpty()
   subject: string;
 
   @IsString()
-  @IsNotEmpty()
   course: string;
 
   @Type(() => Number)
-  @IsInt()
+  @IsNumber()
   @Min(1)
   @Max(8)
   semester: number;
 
-  @IsNotEmpty()
   @IsEnum(ResourceType)
   resourceType: ResourceType;
 
-  @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  @Transform(({ value }) => {
-    if (typeof value === 'string') return value.split(',').map(v => v.trim()).filter(Boolean);
-    return value;
-  })
+  @IsOptional()
   tags?: string[];
+
+  // --- Cloudinary upload result (client sends after direct upload) ---
+  @IsString()
+  publicId: string;           // Cloudinary: public_id
+
+  @IsString()
+  secureUrl: string;          // Cloudinary: secure_url
+
+  @IsString()
+  cloudinarySignature: string; // Cloudinary: signature — used for server-side verification
+
+  @Type(() => Number)
+  @IsNumber()
+  version: number;            // Cloudinary: version — used in signature verification
+
+  @IsString()
+  format: string;             // Cloudinary: format (e.g. 'pdf', 'png')
+
+  @Type(() => Number)
+  @IsNumber()
+  bytes: number;              // Cloudinary: bytes
+
+  @IsString()
+  originalName: string;       // original filename — for inferFileType fallback
+
+  @IsIn(['image', 'raw'])
+  cloudinaryResourceType: 'image' | 'raw';
 }

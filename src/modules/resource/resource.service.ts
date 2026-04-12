@@ -2,12 +2,17 @@ import {
   Injectable,
   NotFoundException,
   InternalServerErrorException,
+  ForbiddenException,
+  BadRequestException,
+  Inject,
 } from '@nestjs/common';
 import { CloudinaryService } from '../storage/cloudinary.service';
 import { InjectModel } from '@nestjs/mongoose';
 import { Resource, ResourceDocument } from './schemas/resource.schema';
 import { Model, Types } from 'mongoose';
-import { CreateResourceByContributorDto } from './dto/create-resource.dto';
+import {
+  CreateResourceDto,
+} from './dto/create-resource.dto';
 import { UpdateResourceByContributorDto } from './dto/update-resource.dto';
 import { ApprovalStatus } from './enums/approval-status.enum';
 import { ResourceQueryDto } from './dto/resource-query.dto';
@@ -17,9 +22,13 @@ import {
   PaginationService,
   PaginatedResult,
 } from 'src/common/services/pagination.service';
-import { inferFileType } from './utils/file.utils';
+import { inferCloudinaryResourceType, inferFileType } from './utils/file.utils';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AdminResourceQueryDto } from './dto/admin-resource-query.dto';
+import { UploadSignatureResponseDto } from './dto/upload-signature-response.dto';
+import { AllowedMimetype } from './dto/request-upload-signature.dto';
+import resourceConfig from '../storage/config/cloudinary.config';
+import { ConfigType } from '@nestjs/config';
 
 const UPLOADED_BY_POPULATE = { path: 'uploadedBy', select: 'name email' };
 
@@ -33,37 +42,80 @@ export class ResourceService {
     private readonly paginationService: PaginationService,
     private readonly eventEmitter: EventEmitter2,
     @InjectModel(Resource.name) private resourceModel: Model<ResourceDocument>,
+    @Inject(resourceConfig.KEY) private resourceCfg: ConfigType<typeof resourceConfig>,
   ) {}
 
-  async create(
-    dto: CreateResourceByContributorDto,
-    file: Express.Multer.File,
+  generateUploadSignature(
+    mimetype: AllowedMimetype,
     userId: string,
-  ) {
-    let uploadResult;
-    try {
-      uploadResult = await this.cloudinaryService.uploadFile(file);
-    } catch {
-      throw new InternalServerErrorException('Upload to storage failed');
+  ): UploadSignatureResponseDto {
+    // Derive cloudinary resource type from mimetype
+    const cloudinaryResourceType = inferCloudinaryResourceType(mimetype);
+    const timestamp = Math.round(Date.now() / 1000);
+    const folder = `campusconnect/resources/${userId}`;
+
+    const paramsToSign = {
+      timestamp,
+      folder,
+      // Cloudinary-side tags for orphan cleanup job — NOT related to Resource.tags
+      tags: `user_${userId},pending_approval`,
+    };
+
+    const signature = this.cloudinaryService.generateSignature(paramsToSign);
+
+    return {
+      signature,
+      timestamp,
+      folder,
+      cloudinaryResourceType,
+      apiKey: this.resourceCfg.apiKey,
+      cloudName: this.resourceCfg.cloudName,
+    };
+  }
+
+  async create(dto: CreateResourceDto, userId: string) {
+    // Step 1: Verify Cloudinary's return signature
+    // Proves the upload actually happened and result wasn't spoofed by client
+    const expectedSignature = this.cloudinaryService.generateSignature({
+      public_id: dto.publicId,
+      version: dto.version,
+    });
+
+    if (expectedSignature !== dto.cloudinarySignature) {
+      throw new BadRequestException('Upload verification failed');
     }
 
-    const fileFormat =
-      uploadResult.format ||
-      file.originalname.split('.').pop()?.toLowerCase() ||
-      'unknown';
+    // Step 2: Verify file lives in this user's folder
+    // Prevents a user from claiming another user's uploaded file
+    const expectedFolder = `campusconnect/resources/${userId}`;
+    if (!dto.publicId.startsWith(expectedFolder)) {
+      throw new ForbiddenException('Upload folder mismatch');
+    }
 
-    const fileType = inferFileType(fileFormat, file.originalname);
+    // Step 3: Derive file metadata — same logic as before, now from dto fields
+    const fileFormat =
+      dto.format ||
+      dto.originalName.split('.').pop()?.toLowerCase() ||
+      'unknown';
+    const fileType = inferFileType(fileFormat, dto.originalName);
 
     try {
       const resource = await this.resourceModel.create({
-        ...dto,
-        fileUrl: uploadResult.url,
-        cloudinaryPublicId: uploadResult.publicId,
+        title: dto.title,
+        description: dto.description,
+        subject: dto.subject,
+        course: dto.course,
+        semester: dto.semester,
+        resourceType: dto.resourceType, // ResourceType enum: Notes, Book, etc.
+        tags: dto.tags ?? [],
+        fileUrl: dto.secureUrl,
+        cloudinaryPublicId: dto.publicId,
         fileFormat,
-        cloudinaryResourceType: uploadResult.resourceType,
-        fileType,
-        fileSize: uploadResult.bytes,
+        fileType, // FileType enum: PDF, DOC, etc.
+        fileSize: dto.bytes,
+        cloudinaryResourceType: dto.cloudinaryResourceType, // 'image' | 'raw'
         uploadedBy: userId,
+        // approvalStatus defaults to PENDING via schema
       });
 
       return this.resourceModel
@@ -72,12 +124,10 @@ export class ResourceService {
         .lean()
         .exec();
     } catch (err) {
-      console.error('DB save failed:', err);
-      if (uploadResult?.publicId) {
-        await this.cloudinaryService
-          .deleteFile(uploadResult.publicId, uploadResult.resourceType)
-          .catch(() => null);
-      }
+      console.error('DB save failed after verified upload:', err);
+      await this.cloudinaryService
+        .deleteFile(dto.publicId, dto.cloudinaryResourceType)
+        .catch(() => null);
       throw new InternalServerErrorException(
         'Database save failed. File rolled back.',
       );
@@ -152,7 +202,7 @@ export class ResourceService {
       this.cloudinaryService
         .deleteFile(
           resource.cloudinaryPublicId,
-          resource.cloudinaryResourceType as 'image' | 'video' | 'raw',
+          resource.cloudinaryResourceType as 'image' | 'raw',
         )
         .catch((err) =>
           console.error(

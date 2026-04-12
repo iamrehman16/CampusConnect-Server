@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import * as express from 'express';
 import { ResourceService } from './resource.service';
-import { CreateResourceByContributorDto } from './dto/create-resource.dto';
+import { CreateResourceDto } from './dto/create-resource.dto';
 import { UpdateResourceByContributorDto } from './dto/update-resource.dto';
 import { Public } from '../auth/decorators/public.decorator';
 import { ParseMongoIdPipe } from 'src/common/pipes/is-mongo-id.pipe';
@@ -26,20 +26,31 @@ import { Roles } from '../user/enums/user-role.enum';
 import { ResourceQueryDto } from './dto/resource-query.dto';
 import { CurrentUser } from '../auth/types/current-user';
 import { ApprovalStatus } from './enums/approval-status.enum';
+import { RequestUploadSignatureDto } from './dto/request-upload-signature.dto';
 
 @Controller('resources')
 export class ResourceController {
   constructor(private readonly resourceService: ResourceService) {}
 
-  @Role(Roles.ADMIN, Roles.CONTRIBUTOR)
-  @Post()
-  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
-  create(
-    @UploadedFile(FileValidationPipe) file: Express.Multer.File,
-    @Body() dto: CreateResourceByContributorDto,
+  // Contributor requests a signature before uploading directly to Cloudinary
+  @Role(Roles.CONTRIBUTOR)
+  @Post('upload-signature')
+  requestUploadSignature(
+    @Body() dto: RequestUploadSignatureDto,
     @Req() req: { user: CurrentUser },
   ) {
-    return this.resourceService.create(dto, file, req.user.id);
+    return this.resourceService.generateUploadSignature(
+      dto.mimetype,
+      req.user.id,
+    );
+  }
+
+  // Both roles submit resource metadata + Cloudinary upload result
+  // No Multer — no file touches this server
+  @Role(Roles.ADMIN, Roles.CONTRIBUTOR)
+  @Post()
+  create(@Body() dto: CreateResourceDto, @Req() req: { user: CurrentUser }) {
+    return this.resourceService.create(dto, req.user.id);
   }
 
   @Public()
@@ -72,7 +83,7 @@ export class ResourceController {
     @Res() res: express.Response,
   ) {
     const url = await this.resourceService.getDownloadUrl(id);
-    return res.json({ url });       // was missing res.json — bare return won't send with @Res()
+    return res.json({ url }); // was missing res.json — bare return won't send with @Res()
   }
 
   @Patch(':id')

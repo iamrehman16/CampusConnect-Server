@@ -6,9 +6,12 @@ import { StorageModule } from '../storage/storage.module';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Resource, ResourceSchema } from './schemas/resource.schema';
 import { CommonModule } from 'src/common/common.module';
+import { ConfigModule } from '@nestjs/config';
+import resourceConfig from '../storage/config/cloudinary.config';
 
 @Module({
   imports: [
+    ConfigModule.forFeature(resourceConfig),
     StorageModule,
     CommonModule,
     MongooseModule.forFeature([{ name: Resource.name, schema: ResourceSchema }]),

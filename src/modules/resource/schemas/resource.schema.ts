@@ -52,10 +52,6 @@ export class Resource {
   @Prop()
   rejectionReason?: string;
 
-  // Community engagement - not considered for now
-  @Prop({ type: [{ type: Types.ObjectId, ref: 'User' }], default: [] })
-  upvotes: Types.ObjectId[];
-
   @Prop({ default: 0 })
   downloads: number;
 
