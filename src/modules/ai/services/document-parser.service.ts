@@ -1,13 +1,13 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigType } from '@nestjs/config';
 import aiConfig from '../config/ai.config';
-import * as fs from 'fs/promises';
-import * as os from 'os';
-import * as path from 'path';
 import FormData from 'form-data';
-import { fetchBuffer, fetchJson } from '../commom/utils/http.utils';
+import { fetchBuffer } from '../commom/utils/http.utils';
 import nodeFetch from 'node-fetch';
-import { DocumentChunk, ParsedDocument } from '../interfaces/document-chunk.interface';
+import {
+  DocumentChunk,
+  ParsedDocument,
+} from '../interfaces/document-chunk.interface';
 
 @Injectable()
 export class DocumentParserService {
@@ -21,40 +21,36 @@ export class DocumentParserService {
     @Inject(aiConfig.KEY) private aiCfg: ConfigType<typeof aiConfig>,
   ) {}
 
-  private async downloadToTemp(
+  // Fetches the file into memory and uploads directly to LlamaParse
+  // No disk involved — buffer lives in process memory for the duration of this call
+  private async uploadForParsing(
     fileUrl: string,
     resourceId: string,
-  ): Promise<string> {
-    const buffer = await fetchBuffer(fileUrl);
-    const extension = path.extname(new URL(fileUrl).pathname) || '.bin';
-    const tempPath = path.join(
-      os.tmpdir(),
-      `campusconnect_${resourceId}${extension}`,
-    );
-    await fs.writeFile(tempPath, buffer);
-    return tempPath;
-  }
-
-  private async uploadForParsing(
-    tempPath: string,
     retries = 3,
   ): Promise<string> {
-    const fileBuffer = await fs.readFile(tempPath);
-    const filename = path.basename(tempPath);
+    const buffer = await fetchBuffer(fileUrl);
+
+    // Derive filename from URL for LlamaParse's content-type sniffing
+    const urlPath = new URL(fileUrl).pathname;
+    const filename = urlPath.split('/').pop() || `resource_${resourceId}.bin`;
 
     for (let attempt = 1; attempt <= retries; attempt++) {
       const formData = new FormData();
-      formData.append('file', fileBuffer, { filename });
+      // Pass buffer directly — no temp file read needed
+      formData.append('file', buffer, { filename });
       formData.append('result_type', 'markdown');
 
-      const response = await nodeFetch(`${this.LLAMA_PARSE_BASE_URL}/upload`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.aiCfg.llamaCloudApiKey}`,
-          ...formData.getHeaders(),
+      const response = await nodeFetch(
+        `${this.LLAMA_PARSE_BASE_URL}/upload`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.aiCfg.llamaCloudApiKey}`,
+            ...formData.getHeaders(),
+          },
+          body: formData,
         },
-        body: formData, 
-      });
+      );
 
       if (response.ok) {
         const data = (await response.json()) as { id: string };
@@ -77,6 +73,7 @@ export class DocumentParserService {
 
     throw new Error('LlamaParse upload failed after all retries');
   }
+
   private async pollForResult(
     jobId: string,
   ): Promise<Array<{ text: string; metadata: any }>> {
@@ -116,11 +113,8 @@ export class DocumentParserService {
   }
 
   async parse(fileUrl: string, resourceId: string): Promise<ParsedDocument> {
-    let tempPath: string | null = null;
-
     try {
-      tempPath = await this.downloadToTemp(fileUrl, resourceId);
-      const jobId = await this.uploadForParsing(tempPath);
+      const jobId = await this.uploadForParsing(fileUrl, resourceId);
       this.logger.log(
         `LlamaParse job started: ${jobId} for resource: ${resourceId}`,
       );
@@ -133,7 +127,7 @@ export class DocumentParserService {
       }
 
       const chunks: DocumentChunk[] = pages
-        .filter((p) => p.text?.trim()) 
+        .filter((p) => p.text?.trim())
         .map((p, index) => ({
           text: p.text,
           pageNumber: parseInt(p.metadata?.page_label ?? `${index + 1}`, 10),
@@ -150,10 +144,6 @@ export class DocumentParserService {
         err,
       );
       throw err;
-    } finally {
-      if (tempPath) {
-        await fs.unlink(tempPath).catch(() => null);
-      }
     }
   }
 }

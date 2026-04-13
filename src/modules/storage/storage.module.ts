@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
 import { CloudinaryService } from './cloudinary.service';
-import { CLOUDINARY_CONFIG_KEY, configureCloudinary } from './config/cloudinary.config';
+import  configureCloudinary  from './config/cloudinary.config';
+import cloudinaryConfig from './config/cloudinary.config';
 
 @Module({
   providers: [
     {
-      provide:CLOUDINARY_CONFIG_KEY,
+      provide:cloudinaryConfig.KEY,
       useFactory:configureCloudinary,
     },
     CloudinaryService

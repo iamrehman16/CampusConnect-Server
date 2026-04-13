@@ -5,19 +5,16 @@ import {
 } from '@nestjs/common';
 import { v2 as cloudinarySDK } from 'cloudinary';
 
-import { CloudinaryUploadResultDto } from './dto/cloudinary-upload-result';
-import { CLOUDINARY_CONFIG_KEY } from './config/cloudinary.config';
-import { inferCloudinaryResourceType } from '../resource/utils/file.utils';
 import {ConfigType } from '@nestjs/config';
-import resourceConfig from './config/cloudinary.config'
+import cloudinaryConfig from './config/cloudinary.config'
 
 @Injectable()
 export class CloudinaryService {
   constructor(
-    @Inject(CLOUDINARY_CONFIG_KEY)
+    @Inject(cloudinaryConfig.KEY)
     private readonly cloudinary: typeof cloudinarySDK,
-    @Inject(resourceConfig.KEY)
-    private resourceCfg: ConfigType<typeof resourceConfig>,
+    @Inject(cloudinaryConfig.KEY)
+    private resourceCfg: ConfigType<typeof cloudinaryConfig>,
   ) {}
 
 
