@@ -34,10 +34,9 @@ import { RetrievalService } from './services/retrieval.service';
     DocumentParserService,
     EmbeddingService,
     VectorStoreService,
-    ResourceApprovedListener,
     ChunkingService,
     RetrievalService,
   ],
-  exports: [AiChatService],
+  exports: [AiChatService,IngestionService],
 })
 export class AiModule {}

@@ -5,6 +5,7 @@ import { VectorStoreService } from './vector-store.service';
 import { Resource } from '../../resource/schemas/resource.schema';
 import { createHash } from 'crypto';
 import { ChunkingService } from './chunking.service';
+import { IngestResourceJobPayload } from 'src/modules/queues/interfaces/ingest-resource-job.interface';
 
 @Injectable()
 export class IngestionService {
@@ -17,8 +18,8 @@ export class IngestionService {
     private readonly chunkingService: ChunkingService
   ) {}
 
-  async ingest(resource: Resource & { _id: any }): Promise<void> {
-    const resourceId = resource._id.toString();
+  async ingest(resource:  IngestResourceJobPayload): Promise<void> {
+    const resourceId = resource.resourceId;
     this.logger.log(`Starting ingestion for resource: ${resourceId}`);
 
     // 1. Parse — get pages

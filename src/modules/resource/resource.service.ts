@@ -29,6 +29,10 @@ import { UploadSignatureResponseDto } from './dto/upload-signature-response.dto'
 import { AllowedMimetype } from './dto/request-upload-signature.dto';
 import resourceConfig from '../storage/config/cloudinary.config';
 import { ConfigType } from '@nestjs/config';
+import { InjectQueue } from '@nestjs/bullmq';
+import { JOBS, QUEUES } from '../queues/queue.constants';
+import { Queue } from 'bullmq';
+import { IngestResourceJobPayload } from '../queues/interfaces/ingest-resource-job.interface';
 
 const UPLOADED_BY_POPULATE = { path: 'uploadedBy', select: 'name email' };
 
@@ -43,6 +47,7 @@ export class ResourceService {
     private readonly eventEmitter: EventEmitter2,
     @InjectModel(Resource.name) private resourceModel: Model<ResourceDocument>,
     @Inject(resourceConfig.KEY) private resourceCfg: ConfigType<typeof resourceConfig>,
+    @InjectQueue(QUEUES.RAG_INGESTION) private readonly ingestionQueue: Queue,
   ) {}
 
   generateUploadSignature(
@@ -255,7 +260,28 @@ export class ResourceService {
     if (!resource)
       throw new NotFoundException('Resource not found or not pending');
 
-    this.eventEmitter.emit('resource.approved', resource);
+    const payload: IngestResourceJobPayload={
+      resourceId:resource._id.toString(),
+      fileUrl:resource.fileUrl,
+      fileType:resource.fileType,
+      cloudinaryResourceType:resource.cloudinaryResourceType,
+      title:resource.title,
+      resourceType:resource.resourceType,
+      semester:resource.semester,
+      course:resource.course,
+      subject:resource.subject,
+    }
+
+    await this.ingestionQueue.add(JOBS.INGEST_RESOURCE,payload,{
+      attempts: 3,
+      backoff:{
+        type: 'exponential',
+        delay: 5000,
+      },
+      removeOnComplete:100,
+      removeOnFail: 200,
+    });
+
     return resource;
   }
 

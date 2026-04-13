@@ -13,9 +13,18 @@ import { AiModule } from './modules/ai/ai.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { CommonModule } from './common/common.module';
 import { ChatModule } from './modules/chat/chat.module';
+import { BullModule } from '@nestjs/bullmq';
+import { QueuesModule } from './modules/queues/queues.module';
 
 @Module({
   imports: [
+
+    BullModule.forRoot({
+      connection:{
+        host:process.env.REDIS_HOST ?? 'localhost',
+        port:parseInt(process.env.REDIS_PORT??'6379'),
+      },
+    }),
     ConfigModule.forRoot({
       isGlobal:true
     }),
@@ -34,7 +43,8 @@ import { ChatModule } from './modules/chat/chat.module';
     PostModule,
     AiModule,
     CommonModule,
-    ChatModule
+    ChatModule,
+    QueuesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -8,6 +8,7 @@ import { Resource, ResourceSchema } from './schemas/resource.schema';
 import { CommonModule } from 'src/common/common.module';
 import { ConfigModule } from '@nestjs/config';
 import resourceConfig from '../storage/config/cloudinary.config';
+import { QueuesModule } from '../queues/queues.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import resourceConfig from '../storage/config/cloudinary.config';
     StorageModule,
     CommonModule,
     MongooseModule.forFeature([{ name: Resource.name, schema: ResourceSchema }]),
+    QueuesModule,
   ],
   controllers: [ResourceController, ResourceAdminController],
   providers: [ResourceService],
