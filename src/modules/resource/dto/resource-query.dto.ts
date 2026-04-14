@@ -3,7 +3,7 @@ import { Type } from 'class-transformer';
 import { ResourceType } from '../enums/resource-types.enum';
 import { ResourceSort } from '../enums/resource-sort.enum';
 import { ApprovalStatus } from '../enums/approval-status.enum';
-import { BaseQueryDto } from 'src/common/dto/base-query.dto';
+import { BaseQueryDto } from '../../../common/dto/base-query.dto';
 
 export class ResourceQueryDto extends BaseQueryDto {
 

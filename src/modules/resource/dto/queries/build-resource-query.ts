@@ -2,7 +2,7 @@ import { QueryFilter } from 'mongoose';
 import { ResourceDocument } from '../../schemas/resource.schema';
 import { ResourceQueryDto } from '../resource-query.dto';
 import { ApprovalStatus } from '../../enums/approval-status.enum';
-import { IQueryBuilder } from 'src/common/interfaces/query-builder.interface';
+import { IQueryBuilder } from '../../../../common/interfaces/query-builder.interface';
 
 export class ResourceQueryBuilder implements IQueryBuilder<ResourceQueryDto> {
   build(dto: ResourceQueryDto): QueryFilter<ResourceDocument> {

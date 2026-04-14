@@ -10,9 +10,9 @@ import {
 } from './schema/conversation.schema';
 import { Model, Types } from 'mongoose';
 import { Message, MessageDocument } from './schema/message.schema';
-import { PaginationService } from 'src/common/services/pagination.service';
+import { PaginationService } from '../../common/services/pagination.service';
 import { StartConversationDto } from './dto/start-conversation.dto';
-import { BaseQueryDto } from 'src/common/dto/base-query.dto';
+import { BaseQueryDto } from '../../common/dto/base-query.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 
 @Injectable()

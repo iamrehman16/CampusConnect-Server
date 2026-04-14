@@ -15,7 +15,7 @@ import { CreateCommentDto, UpdateCommentDto } from './dto/comment.dto';
 import { CurrentUser } from '../auth/types/current-user';
 import { Role } from '../auth/decorators/role.decorator';
 import { Roles } from '../user/enums/user-role.enum';
-import { BaseQueryDto } from 'src/common/dto/base-query.dto';
+import { BaseQueryDto } from '../../common/dto/base-query.dto';
 
 @Role(Roles.CONTRIBUTOR, Roles.STUDENT,Roles.ADMIN)
 @Controller('posts')

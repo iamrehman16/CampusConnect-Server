@@ -21,7 +21,7 @@ import { ResourceSortBuilder } from './dto/queries/build-resource-sort';
 import {
   PaginationService,
   PaginatedResult,
-} from 'src/common/services/pagination.service';
+} from '../../common/services/pagination.service';
 import { inferCloudinaryResourceType, inferFileType } from './utils/file.utils';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AdminResourceQueryDto } from './dto/admin-resource-query.dto';

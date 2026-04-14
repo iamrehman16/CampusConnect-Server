@@ -5,7 +5,7 @@ import { ResourceAdminController } from './resource-admin.controller';
 import { StorageModule } from '../storage/storage.module';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Resource, ResourceSchema } from './schemas/resource.schema';
-import { CommonModule } from 'src/common/common.module';
+import { CommonModule } from '../../common/common.module';
 import { ConfigModule } from '@nestjs/config';
 import resourceConfig from '../storage/config/cloudinary.config';
 import { QueuesModule } from '../queues/queues.module';

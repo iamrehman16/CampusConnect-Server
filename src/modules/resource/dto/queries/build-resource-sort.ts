@@ -1,6 +1,6 @@
 import { ResourceQueryDto } from '../resource-query.dto';
 import { ResourceSort } from '../../enums/resource-sort.enum';
-import { ISortBuilder } from 'src/common/interfaces/sort-builder.interface';
+import { ISortBuilder } from '../../../../common/interfaces/sort-builder.interface';
 
 export class ResourceSortBuilder implements ISortBuilder {
   build(dto: ResourceQueryDto): Record<string, 1 | -1> {

@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { StartConversationDto } from './dto/start-conversation.dto';
-import { BaseQueryDto } from 'src/common/dto/base-query.dto';
+import { BaseQueryDto } from '../../common/dto/base-query.dto';
 import { CurrentUser } from '../auth/types/current-user';
 
 @Controller('conversations')

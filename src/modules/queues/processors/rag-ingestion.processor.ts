@@ -1,7 +1,7 @@
 import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
 import { QUEUES } from '../queue.constants';
 import { Logger } from '@nestjs/common';
-import { IngestionService } from 'src/modules/ai/services/ingestion.service';
+import { IngestionService } from '../../ai/services/ingestion.service';
 import { Job } from 'bullmq';
 import { IngestResourceJobPayload } from '../interfaces/ingest-resource-job.interface';
 

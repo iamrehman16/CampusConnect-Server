@@ -5,7 +5,7 @@ import { VectorStoreService } from './vector-store.service';
 import { Resource } from '../../resource/schemas/resource.schema';
 import { createHash } from 'crypto';
 import { ChunkingService } from './chunking.service';
-import { IngestResourceJobPayload } from 'src/modules/queues/interfaces/ingest-resource-job.interface';
+import { IngestResourceJobPayload } from '../../queues/interfaces/ingest-resource-job.interface';
 
 @Injectable()
 export class IngestionService {

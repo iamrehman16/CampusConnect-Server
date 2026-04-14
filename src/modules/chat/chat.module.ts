@@ -8,7 +8,7 @@ import { ChatController } from './chat.controller';
 import { Conversation, ConversationSchema } from './schema/conversation.schema';
 import { Message, MessageSchema } from './schema/message.schema';
 import { WsJwtGuard } from './guards/websocket.jwt.guard';
-import { CommonModule } from 'src/common/common.module';
+import { CommonModule } from '../../common/common.module';
 import jwtConfig from '../auth/config/jwt.config';
 
 @Module({

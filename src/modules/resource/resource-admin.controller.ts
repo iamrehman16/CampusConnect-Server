@@ -8,7 +8,7 @@ import {
   Req,
 } from '@nestjs/common';
 import { ResourceService } from './resource.service';
-import { ParseMongoIdPipe } from 'src/common/pipes/is-mongo-id.pipe';
+import { ParseMongoIdPipe } from '../../common/pipes/is-mongo-id.pipe';
 import { Role } from '../auth/decorators/role.decorator';
 import { Roles } from '../user/enums/user-role.enum';
 import { RejectResourceDto } from './dto/reject-resource.dto';

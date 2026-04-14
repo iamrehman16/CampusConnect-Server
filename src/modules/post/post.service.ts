@@ -11,11 +11,11 @@ import { Comment, CommentDocument } from './schemas/comment.schema';
 import { CreatePostDto, PostStats, UpdatePostDto } from './dto/post.dto';
 import { CreateCommentDto, UpdateCommentDto } from './dto/comment.dto';
 import { AdminUpdatePostDto } from './dto/admin-post.dto';
-import { BaseQueryDto } from 'src/common/dto/base-query.dto';
+import { BaseQueryDto } from '../../common/dto/base-query.dto';
 import {
   PaginationService,
   PaginatedResult,
-} from 'src/common/services/pagination.service';
+} from '../../common/services/pagination.service';
 import { Roles } from '../user/enums/user-role.enum';
 
 @Injectable()
