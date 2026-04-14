@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import {ConfigModule, ConfigService} from "@nestjs/config";
-import {MongooseModule} from "@nestjs/mongoose";
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { MongooseModule } from '@nestjs/mongoose';
 import { UserModule } from './modules/user/user.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ResourceModule } from './modules/resource/resource.module';
@@ -18,21 +18,35 @@ import { QueuesModule } from './modules/queues/queues.module';
 
 @Module({
   imports: [
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        const isProduction =
+          configService.get<string>('NODE_ENV') === 'production';
 
-    BullModule.forRoot({
-      connection:{
-        host:process.env.REDIS_HOST ?? 'localhost',
-        port:parseInt(process.env.REDIS_PORT??'6379'),
+        return {
+          connection: {
+            url: isProduction
+              ? configService.get<string>('REDIS_UPSTASH_URL')
+              : configService.get<string>('REDIS_LOCAL_URL'),
+          },
+        };
       },
     }),
     ConfigModule.forRoot({
-      isGlobal:true
+      isGlobal: true,
     }),
     MongooseModule.forRootAsync({
-      inject:[ConfigService],
-      useFactory:(configService:ConfigService)=>({
-        uri: configService.get<string>("MONGO_URI_Local")
-      })
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        const isProduction =
+          configService.get<string>('NODE_ENV') === 'production';
+        return {
+          uri: isProduction
+            ? configService.get<string>('MONGO_URI')
+            : configService.get<string>('MONGO_URI_Local'),
+        };
+      },
     }),
     EventEmitterModule.forRoot(),
     UserModule,
