@@ -33,7 +33,7 @@ export class ResourceController {
   constructor(private readonly resourceService: ResourceService) {}
 
   // Contributor requests a signature before uploading directly to Cloudinary
-  @Role(Roles.CONTRIBUTOR)
+  @Role(Roles.ADMIN,Roles.CONTRIBUTOR, )
   @Post('upload-signature')
   requestUploadSignature(
     @Body() dto: RequestUploadSignatureDto,

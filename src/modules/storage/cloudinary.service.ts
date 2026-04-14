@@ -10,9 +10,10 @@ import cloudinaryConfig from './config/cloudinary.config'
 
 @Injectable()
 export class CloudinaryService {
+
+  private readonly cloudinary = cloudinarySDK;
+
   constructor(
-    @Inject(cloudinaryConfig.KEY)
-    private readonly cloudinary: typeof cloudinarySDK,
     @Inject(cloudinaryConfig.KEY)
     private resourceCfg: ConfigType<typeof cloudinaryConfig>,
   ) {}
