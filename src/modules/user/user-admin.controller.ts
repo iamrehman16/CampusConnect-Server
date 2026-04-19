@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { Role } from '../auth/decorators/role.decorator';
@@ -16,6 +17,8 @@ import { AdminCreateUserDto } from './dto/admin-create-user.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guards';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { UpdateUserRoleDto } from './dto/update-user-role.dto';
+import { UserQueryDto } from './dto/user-query.dto';
+import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 
 @Controller('admin/users')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -29,8 +32,8 @@ export class UserAdminController {
   }
 
   @Get()
-  findAll() {
-    return this.userService.findAll();
+  findAll(@Query() dto: UserQueryDto) {
+    return this.userService.findAll(dto);
   }
 
   @Get(':id')
@@ -46,6 +49,11 @@ export class UserAdminController {
   @Patch(':id/role')
   updateRole(@Param('id') id: string, @Body() dto: UpdateUserRoleDto) {
     return this.userService.updateRole(id, dto.role);
+  }
+
+  @Patch(':id/status')
+  updateStatus(@Param('id') id: string, @Body() dto: UpdateUserStatusDto) {
+    return this.userService.updateStatus(id, dto.status);
   }
 
   @Delete(':id')

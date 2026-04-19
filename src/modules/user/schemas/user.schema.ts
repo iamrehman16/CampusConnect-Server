@@ -1,6 +1,7 @@
 import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
 import { Roles } from "../enums/user-role.enum";
 import { UserStatus } from "../enums/user-status.enum";
+import { HydratedDocument } from "mongoose";
 
 @Schema({
   timestamps: true,
@@ -39,6 +40,12 @@ export class User {
 
   @Prop({ default: UserStatus.ACTIVE, enum: UserStatus, type:String })
   accountStatus: UserStatus;
+
+  @Prop({ required: false, min: 1, max: 8 })
+  semester: number;
 }
+
+export type UserDocument = HydratedDocument<User>;
+
 
 export const UserSchema = SchemaFactory.createForClass(User);

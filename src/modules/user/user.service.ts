@@ -15,10 +15,23 @@ import { UserStatus } from './enums/user-status.enum';
 import { AdminCreateUserDto } from './dto/admin-create-user.dto';
 import { UserGrowthDto } from '../dashboard/dto/resource-analytics.dto';
 import { format } from 'path';
+import { UserQueryDto } from './dto/user-query.dto';
+import {
+  PaginatedResult,
+  PaginationService,
+} from 'src/common/services/pagination.service';
+import { UserQueryBuilder } from './queries/build-user-query';
+import { UserSortBuilder } from './queries/build-user-sort';
 
 @Injectable()
 export class UserService {
-  constructor(@InjectModel(User.name) private userModel: Model<User>) {}
+  private readonly queryBuilder = new UserQueryBuilder();
+  private readonly sortBuilder = new UserSortBuilder();
+
+  constructor(
+    @InjectModel(User.name) private userModel: Model<User>,
+    private readonly paginationService: PaginationService,
+  ) {}
 
   async createUser(dto: RegisterUserDto) {
     const hashedPassword = await bcrypt.hash(dto.password, 10);
@@ -54,8 +67,13 @@ export class UserService {
     return newUser.save();
   }
 
-  async findAll() {
-    return this.userModel.find().exec();
+  async findAll(dto: UserQueryDto): Promise<PaginatedResult<User>> {
+    return this.paginationService.paginate(
+      this.userModel,
+      dto,
+      this.queryBuilder,
+      this.sortBuilder,
+    );
   }
 
   async findOne(userId: string) {
@@ -63,7 +81,7 @@ export class UserService {
     if (!user) {
       throw new NotFoundException(`User with id ${userId} not found`);
     }
-    return user;
+    return user.toObject();
   }
 
   async findOneWithHashedRefreshToken(userId: string) {
@@ -74,7 +92,7 @@ export class UserService {
     if (!user) {
       throw new NotFoundException(`User with id ${userId} not found`);
     }
-    return user;
+    return user.toObject();
   }
 
   async findByEmail(email: string) {
@@ -85,7 +103,7 @@ export class UserService {
     if (!user) {
       throw new NotFoundException(`User with id ${email} not found`);
     }
-    return user;
+    return user.toObject();
   }
 
   async updateUserByAdmin(id: string, dto: AdminUpdateUserDto) {
@@ -97,7 +115,7 @@ export class UserService {
       throw new NotFoundException(`User with id ${id} not found`);
     }
 
-    return updatedUser;
+    return updatedUser.toObject();
   }
 
   async updateRole(id: string, role: Roles) {
@@ -109,7 +127,19 @@ export class UserService {
       throw new NotFoundException(`User with id ${id} not found`);
     }
 
-    return updatedUser;
+    return updatedUser.toObject();
+  }
+
+  async updateStatus(id: string, accountStatus: UserStatus) {
+    const updatedUser = await this.userModel
+      .findByIdAndUpdate(id, { accountStatus }, { new: true })
+      .exec();
+
+    if (!updatedUser) {
+      throw new NotFoundException(`User with id ${id} not found`);
+    }
+
+    return updatedUser.toObject();
   }
 
   async updateProfile(userId: string, dto: UpdateUserProfileDto) {
@@ -125,7 +155,7 @@ export class UserService {
       throw new NotFoundException(`User with id ${userId} not found`);
     }
 
-    return updatedUser;
+    return updatedUser.toObject();
   }
 
   async remove(id: string) {
@@ -133,7 +163,7 @@ export class UserService {
     if (!deletedUser) {
       throw new NotFoundException(`User with id ${id} not found`);
     }
-    return deletedUser;
+    return deletedUser.toObject();
   }
 
   async updateRefreshToken(userId: string, hashedRefreshToken: string | null) {
