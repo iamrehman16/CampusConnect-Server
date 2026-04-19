@@ -1,19 +1,18 @@
-import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
-import { Roles } from "../enums/user-role.enum";
-import { UserStatus } from "../enums/user-status.enum";
-import { HydratedDocument } from "mongoose";
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Roles } from '../enums/user-role.enum';
+import { UserStatus } from '../enums/user-status.enum';
+import { HydratedDocument } from 'mongoose';
 
 @Schema({
   timestamps: true,
   toJSON: {
-    transform(doc, ret:any) {
+    transform(doc, ret: any) {
       delete ret.password;
       return ret;
     },
   },
 })
 export class User {
-
   @Prop({ required: true, unique: true, index: true })
   email: string;
 
@@ -23,10 +22,10 @@ export class User {
   @Prop({ default: '' })
   name?: string;
 
-  @Prop({ default: null, select:false })
+  @Prop({ default: null, select: false })
   hashedRefreshToken?: string;
 
-  @Prop({ default: Roles.STUDENT, type:String, enum:Roles })
+  @Prop({ default: Roles.STUDENT, type: String, enum: Roles })
   role: Roles;
 
   @Prop()
@@ -38,7 +37,7 @@ export class User {
   @Prop({ default: 0 })
   contributionScore: number;
 
-  @Prop({ default: UserStatus.ACTIVE, enum: UserStatus, type:String })
+  @Prop({ default: UserStatus.ACTIVE, enum: UserStatus, type: String })
   accountStatus: UserStatus;
 
   @Prop({ required: false, min: 1, max: 8 })
@@ -47,5 +46,6 @@ export class User {
 
 export type UserDocument = HydratedDocument<User>;
 
-
 export const UserSchema = SchemaFactory.createForClass(User);
+
+UserSchema.index({ name: 'text', email: 'text' });

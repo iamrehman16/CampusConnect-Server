@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, Min, Max, IsEnum } from "class-validator";
+import { IsInt, IsOptional, Min, Max, IsEnum, IsString } from "class-validator";
 import { Type } from "class-transformer";
 import { BaseQueryDto } from "src/common/dto/base-query.dto";
 import { Roles } from "../enums/user-role.enum";
@@ -20,4 +20,8 @@ export class UserQueryDto extends BaseQueryDto {
     @IsOptional()
     @IsEnum(UserStatus)
     status?:UserStatus;
+
+    @IsOptional()
+    @IsString()
+    search?:string;
 }
