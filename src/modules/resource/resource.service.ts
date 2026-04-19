@@ -10,9 +10,7 @@ import { CloudinaryService } from '../storage/cloudinary.service';
 import { InjectModel } from '@nestjs/mongoose';
 import { Resource, ResourceDocument } from './schemas/resource.schema';
 import { Model, Types } from 'mongoose';
-import {
-  CreateResourceDto,
-} from './dto/create-resource.dto';
+import { CreateResourceDto } from './dto/create-resource.dto';
 import { UpdateResourceByContributorDto } from './dto/update-resource.dto';
 import { ApprovalStatus } from './enums/approval-status.enum';
 import { ResourceQueryDto } from './dto/resource-query.dto';
@@ -33,6 +31,10 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { JOBS, QUEUES } from '../queues/queue.constants';
 import { Queue } from 'bullmq';
 import { IngestResourceJobPayload } from '../queues/interfaces/ingest-resource-job.interface';
+import {
+  ApprovalFunnelDto,
+  ResourceAnalyticsDto,
+} from '../dashboard/dto/resource-analytics.dto';
 
 const UPLOADED_BY_POPULATE = { path: 'uploadedBy', select: 'name email' };
 
@@ -46,7 +48,8 @@ export class ResourceService {
     private readonly paginationService: PaginationService,
     private readonly eventEmitter: EventEmitter2,
     @InjectModel(Resource.name) private resourceModel: Model<ResourceDocument>,
-    @Inject(resourceConfig.KEY) private resourceCfg: ConfigType<typeof resourceConfig>,
+    @Inject(resourceConfig.KEY)
+    private resourceCfg: ConfigType<typeof resourceConfig>,
     @InjectQueue(QUEUES.RAG_INGESTION) private readonly ingestionQueue: Queue,
   ) {}
 
@@ -260,25 +263,25 @@ export class ResourceService {
     if (!resource)
       throw new NotFoundException('Resource not found or not pending');
 
-    const payload: IngestResourceJobPayload={
-      resourceId:resource._id.toString(),
-      fileUrl:resource.fileUrl,
-      fileType:resource.fileType,
-      cloudinaryResourceType:resource.cloudinaryResourceType,
-      title:resource.title,
-      resourceType:resource.resourceType,
-      semester:resource.semester,
-      course:resource.course,
-      subject:resource.subject,
-    }
+    const payload: IngestResourceJobPayload = {
+      resourceId: resource._id.toString(),
+      fileUrl: resource.fileUrl,
+      fileType: resource.fileType,
+      cloudinaryResourceType: resource.cloudinaryResourceType,
+      title: resource.title,
+      resourceType: resource.resourceType,
+      semester: resource.semester,
+      course: resource.course,
+      subject: resource.subject,
+    };
 
-    await this.ingestionQueue.add(JOBS.INGEST_RESOURCE,payload,{
+    await this.ingestionQueue.add(JOBS.INGEST_RESOURCE, payload, {
       attempts: 3,
-      backoff:{
+      backoff: {
         type: 'exponential',
         delay: 5000,
       },
-      removeOnComplete:100,
+      removeOnComplete: 100,
       removeOnFail: 200,
     });
 
@@ -334,5 +337,138 @@ export class ResourceService {
     } catch {
       throw new InternalServerErrorException('Failed to fetch resource stats');
     }
+  }
+
+  // resource/resource.service.ts  (add this method)
+  async getAnalytics(): Promise<ResourceAnalyticsDto> {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    thirtyDaysAgo.setHours(0, 0, 0, 0);
+
+    const [result] = await this.resourceModel.aggregate([
+      { $match: { isDeleted: false } },
+      {
+        $facet: {
+          // --- Daily uploads (last 30 days) ---
+          dailyUploads: [
+            { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+            {
+              $group: {
+                _id: {
+                  $dateToString: { format: '%Y-%m-%d', date: '$createdAt' },
+                },
+                count: { $sum: 1 },
+              },
+            },
+            { $sort: { _id: 1 } },
+            { $project: { _id: 0, date: '$_id', count: 1 } },
+          ],
+
+          // --- Approval funnel ---
+          approvalFunnel: [
+            {
+              $group: {
+                _id: '$approvalStatus',
+                count: { $sum: 1 },
+              },
+            },
+          ],
+
+          // --- By file type ---
+          byFileType: [
+            { $group: { _id: '$fileType', count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+            { $project: { _id: 0, label: '$_id', count: 1 } },
+          ],
+
+          // --- By subject (top 8) ---
+          bySubject: [
+            { $group: { _id: '$subject', count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+            { $limit: 8 },
+            { $project: { _id: 0, label: '$_id', count: 1 } },
+          ],
+
+          // --- By semester ---
+          bySemester: [
+            { $group: { _id: '$semester', count: { $sum: 1 } } },
+            { $sort: { _id: 1 } },
+            { $project: { _id: 0, label: { $toString: '$_id' }, count: 1 } },
+          ],
+
+          // --- Avg approval time (approved resources only) ---
+          approvalTiming: [
+            { $match: { approvalStatus: ApprovalStatus.APPROVED } },
+            {
+              $project: {
+                diffMs: {
+                  $subtract: ['$updatedAt', '$createdAt'],
+                },
+              },
+            },
+            {
+              $group: {
+                _id: null,
+                avgMs: { $avg: '$diffMs' },
+              },
+            },
+          ],
+
+          // --- Top contributors (top 5) ---
+          topContributors: [
+            {
+              $group: {
+                _id: '$uploadedBy',
+                uploads: { $sum: 1 },
+              },
+            },
+            { $sort: { uploads: -1 } },
+            { $limit: 5 },
+            {
+              $lookup: {
+                from: 'users',
+                localField: '_id',
+                foreignField: '_id',
+                as: 'user',
+              },
+            },
+            { $unwind: { path: '$user', preserveNullAndEmptyArrays: false } },
+            {
+              $project: {
+                _id: 0,
+                userId: { $toString: '$_id' },
+                name: '$user.name', // adjust to your User.name field
+                uploads: 1,
+              },
+            },
+          ],
+        },
+      },
+    ]);
+
+    // --- Shape the approval funnel from array → object ---
+    const funnel: ApprovalFunnelDto = {
+      pending: 0,
+      approved: 0,
+      rejected: 0,
+    };
+    for (const { _id, count } of result.approvalFunnel) {
+      if (_id === ApprovalStatus.PENDING) funnel.pending = count;
+      else if (_id === ApprovalStatus.APPROVED) funnel.approved = count;
+      else if (_id === ApprovalStatus.REJECTED) funnel.rejected = count;
+    }
+
+    const avgMs = result.approvalTiming[0]?.avgMs ?? 0;
+    const avgApprovalHours = Math.round((avgMs / (1000 * 60 * 60)) * 10) / 10;
+
+    return {
+      dailyUploads: result.dailyUploads,
+      approvalFunnel: funnel,
+      byFileType: result.byFileType,
+      bySubject: result.bySubject,
+      bySemester: result.bySemester,
+      avgApprovalHours,
+      topContributors: result.topContributors,
+    };
   }
 }

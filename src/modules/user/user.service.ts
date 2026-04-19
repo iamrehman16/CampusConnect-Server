@@ -13,6 +13,8 @@ import { RegisterUserDto } from './dto/register-user.dto';
 import { Roles } from './enums/user-role.enum';
 import { UserStatus } from './enums/user-status.enum';
 import { AdminCreateUserDto } from './dto/admin-create-user.dto';
+import { UserGrowthDto } from '../dashboard/dto/resource-analytics.dto';
+import { format } from 'path';
 
 @Injectable()
 export class UserService {
@@ -134,6 +136,16 @@ export class UserService {
     return deletedUser;
   }
 
+  async updateRefreshToken(userId: string, hashedRefreshToken: string | null) {
+    return await this.userModel.findByIdAndUpdate(
+      userId,
+      { hashedRefreshToken: hashedRefreshToken },
+      { new: true },
+    );
+  }
+
+  //stats
+
   async getStats() {
     const [total, contributors] = await Promise.all([
       this.userModel.countDocuments(),
@@ -142,11 +154,23 @@ export class UserService {
     return { total, contributors };
   }
 
-  async updateRefreshToken(userId: string, hashedRefreshToken: string | null) {
-    return await this.userModel.findByIdAndUpdate(
-      userId,
-      { hashedRefreshToken: hashedRefreshToken },
-      { new: true },
-    );
+  async getGrowth(): Promise<UserGrowthDto> {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    thirtyDaysAgo.setHours(0, 0, 0, 0);
+
+    const rows = await this.userModel.aggregate([
+      { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+      { $project: { _id: 0, date: '$_id', count: 1 } },
+    ]);
+
+    return { dailyRegistrations: rows };
   }
 }

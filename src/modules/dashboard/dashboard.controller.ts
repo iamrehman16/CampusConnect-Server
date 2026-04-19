@@ -15,4 +15,15 @@ export class DashboardController {
   async getStats() {
     return this.dashboardService.getOverviewStats();
   }
+
+  @Get('resources/analytics')
+  getResourceAnalytics(){
+    return this.dashboardService.getResourceAnalytics();
+  }
+
+  @Get('users/growth')
+  getUserGrowth(){
+    return this.dashboardService.getUserGrowth();
+  }
+
 }
