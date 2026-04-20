@@ -17,9 +17,13 @@ import {
   PaginatedResult,
 } from '../../common/services/pagination.service';
 import { Roles } from '../user/enums/user-role.enum';
+import { PostQueryBuilder } from './queries/build-post-query';
+import { PostQueryDto } from './dto/post-query.dto';
 
 @Injectable()
 export class PostService {
+  private readonly queryBuilder = new PostQueryBuilder();
+
   constructor(
     @InjectModel(Post.name) private postModel: Model<PostDocument>,
     @InjectModel(Comment.name) private commentModel: Model<CommentDocument>,
@@ -42,11 +46,11 @@ export class PostService {
     return populatedPost.toObject();
   }
 
-  async getAllPosts(dto: BaseQueryDto): Promise<PaginatedResult<Post>> {
+  async getAllPosts(dto: PostQueryDto): Promise<PaginatedResult<Post>> {
     return this.paginationService.paginateWithPopulate(
       this.postModel,
       dto,
-      { build: () => ({ isDeleted: false }) },
+      this.queryBuilder,
       { build: () => ({ createdAt: -1 }) },
       { path: 'author', select: 'name email' },
     );
@@ -257,7 +261,7 @@ export class PostService {
     id: string,
     dto: UpdateCommentDto,
     userId: string,
-    userRole: String,
+    userRole: string,
   ) {
     const isAdmin = userRole === Roles.ADMIN;
 

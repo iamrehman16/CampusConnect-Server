@@ -30,7 +30,7 @@ export class ResourceController {
   constructor(private readonly resourceService: ResourceService) {}
 
   // Contributor requests a signature before uploading directly to Cloudinary
-  @Role(Roles.ADMIN,Roles.CONTRIBUTOR, )
+  @Role(Roles.ADMIN, Roles.CONTRIBUTOR)
   @Post('upload-signature')
   requestUploadSignature(
     @Body() dto: RequestUploadSignatureDto,
@@ -64,6 +64,15 @@ export class ResourceController {
     @Req() req: { user: CurrentUser },
   ) {
     query.uploadedBy = req.user.id;
+    return this.resourceService.findAll(query);
+  }
+
+  @Get('user/:id')
+  getResourcesByUser(
+    @Query() query: ResourceQueryDto,
+    @Param('id') id: string,
+  ) {
+    query.uploadedBy = id;
     return this.resourceService.findAll(query);
   }
 

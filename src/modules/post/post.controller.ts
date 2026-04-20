@@ -17,7 +17,7 @@ import { Role } from '../auth/decorators/role.decorator';
 import { Roles } from '../user/enums/user-role.enum';
 import { BaseQueryDto } from '../../common/dto/base-query.dto';
 
-@Role(Roles.CONTRIBUTOR, Roles.STUDENT,Roles.ADMIN)
+@Role(Roles.CONTRIBUTOR, Roles.STUDENT, Roles.ADMIN)
 @Controller('posts')
 export class PostController {
   constructor(private readonly postService: PostService) {}
@@ -28,15 +28,8 @@ export class PostController {
   }
 
   @Get()
-  getAllPosts(
-     @Query() dto: BaseQueryDto
-  ) {
-    return this.postService.getAllPosts(dto);
-  }
-
-  @Get(':id')
-  getPostById(@Param('id') id: string) {
-    return this.postService.getPostById(id);
+  getAllPosts(@Query() dto: BaseQueryDto) {
+    return this.postService.getAllPosts({ ...dto, id: '' });
   }
 
   @Patch(':id')
@@ -50,7 +43,7 @@ export class PostController {
 
   @Delete(':id')
   deletePost(@Param('id') id: string, @Req() req: { user: CurrentUser }) {
-    return this.postService.deletePost(id, req.user.id,req.user.role);
+    return this.postService.deletePost(id, req.user.id, req.user.role);
   }
 
   @Post(':id/upvote')
@@ -78,7 +71,12 @@ export class PostController {
     @Body() dto: UpdateCommentDto,
     @Req() req: { user: CurrentUser },
   ) {
-    return this.postService.updateComment(commentId, dto, req.user.id, req.user.role);
+    return this.postService.updateComment(
+      commentId,
+      dto,
+      req.user.id,
+      req.user.role,
+    );
   }
 
   @Delete('comments/:commentId')
@@ -86,12 +84,34 @@ export class PostController {
     @Param('commentId') commentId: string,
     @Req() req: { user: CurrentUser },
   ) {
-    return this.postService.deleteComment(commentId, req.user.id, req.user.role);
+    return this.postService.deleteComment(
+      commentId,
+      req.user.id,
+      req.user.role,
+    );
   }
 
   @Get('stats')
-  getPostStats(){
+  getPostStats() {
     return this.postService.getPostStats();
   }
 
+  @Get('my')
+  async getMyPost(
+    @Query() dto: BaseQueryDto,
+    @Req() req: { user: CurrentUser },
+  ) {
+    const id = req.user.id;
+    return this.postService.getAllPosts({ ...dto, id });
+  }
+
+  @Get(':id')
+  getPostById(@Param('id') id: string) {
+    return this.postService.getPostById(id);
+  }
+
+  @Get('user/:id')
+  async getPostByUser(@Query() dto: BaseQueryDto, @Param('id') id: string) {
+    return this.postService.getAllPosts({ ...dto, id });
+  }
 }
