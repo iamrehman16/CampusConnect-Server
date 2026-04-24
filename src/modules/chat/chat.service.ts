@@ -12,8 +12,8 @@ import { Model, Types } from 'mongoose';
 import { Message, MessageDocument } from './schema/message.schema';
 import { PaginationService } from '../../common/services/pagination.service';
 import { StartConversationDto } from './dto/start-conversation.dto';
-import { BaseQueryDto } from '../../common/dto/base-query.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
+import { GetMessagesDto } from './dto/get-message.dto';
 
 @Injectable()
 export class ChatService {
@@ -64,7 +64,9 @@ export class ChatService {
       .exec();
   }
 
-  async getMessages(conversationId: string, userId: string, dto: BaseQueryDto) {
+  async getMessages(userId: string, dto: GetMessagesDto) {
+    const conversationId = dto.conversationId;
+
     await this.verifyParticipant(conversationId, userId);
 
     return this.paginationService.paginate(

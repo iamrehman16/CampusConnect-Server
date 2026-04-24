@@ -19,6 +19,7 @@ import { WsJwtGuard } from './guards/websocket.jwt.guard';
 import { WsExceptionFilter } from './filters/websocket-exception.filter';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { DeleteMessageDto } from './dto/delete-message.dto';
+import { MarkSeenDto } from './dto/mark-seen.dto';
 
 @WebSocketGateway({
   cors: { origin: '*' },
@@ -30,7 +31,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
-  private connectedUsers = new Map<string, string>();
+  private connectedUsers = new Map<string, Set<string>>();
 
   constructor(
     private readonly chatService: ChatService,
@@ -40,19 +41,23 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   async handleConnection(socket: Socket) {
     try {
       const user = await this.wsJwtGuard.validateSocket(socket);
+
       socket.data.userId = user.id;
-      this.connectedUsers.set(user.id, socket.id);
-      console.log(`User ${user.id} connected - socket ${socket.id}`);
-    } catch (error) {
+
+      // user identity room (key change)
+      socket.join(user.id);
+
+      console.log(`User ${user.id} connected`);
+    } catch (e) {
       socket.disconnect();
     }
   }
 
   handleDisconnect(socket: Socket) {
     const userId = socket.data.userId;
+
     if (userId) {
-      this.connectedUsers.delete(userId);
-      console.log(`User ${userId} disconnected`);
+      console.log(`User ${userId} disconnected socket ${socket.id}`);
     }
   }
 
@@ -63,6 +68,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() conversationId: string,
   ) {
     socket.join(conversationId);
+
     return { event: 'joined', data: conversationId };
   }
 
@@ -78,16 +84,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     this.server.to(dto.conversationId).emit('new_message', message);
 
-    const receiverId = await this.chatService.getReceiverIdFromConversation(
-      dto.conversationId,
-      senderId,
-    );
-
-    const receiverSocketId = this.connectedUsers.get(receiverId);
-    if (receiverSocketId) {
-      this.server.to(receiverSocketId).emit('new_message', message);
-    }
-
     return message;
   }
 
@@ -101,10 +97,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     await this.chatService.markSeen(conversationId, userId);
 
-    this.server.to(conversationId).emit('messages_seen', {
+    const dto: MarkSeenDto = {
       conversationId,
       seenBy: userId,
-    });
+    };
+
+    this.server.to(conversationId).emit('messages_seen', dto);
   }
 
   @UseGuards(WsJwtGuard)
@@ -115,17 +113,36 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {
     const userId = socket.data.userId;
 
-    const message = await this.chatService.deleteMessage(
+    await this.chatService.deleteMessage(
       dto.messageId,
       dto.conversationId,
       userId,
     );
 
-    this.server.to(dto.conversationId).emit('message_deleted', {
+    const deleteDto: DeleteMessageDto = {
       messageId: dto.messageId,
       conversationId: dto.conversationId,
-    });
+    };
 
-    return message;
+    this.server.to(dto.conversationId).emit('message_deleted', deleteDto);
+  }
+
+  //private helpers
+  private addUserSocket(userId: string, socketId: string) {
+    if (!this.connectedUsers.has(userId)) {
+      this.connectedUsers.set(userId, new Set());
+    }
+    this.connectedUsers.get(userId)!.add(socketId);
+  }
+
+  private removeUserSocket(userId: string, socketId: string) {
+    const sockets = this.connectedUsers.get(userId);
+    if (!sockets) return;
+
+    sockets.delete(socketId);
+
+    if (sockets.size === 0) {
+      this.connectedUsers.delete(userId);
+    }
   }
 }

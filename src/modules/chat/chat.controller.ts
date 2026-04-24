@@ -10,8 +10,8 @@ import {
 } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { StartConversationDto } from './dto/start-conversation.dto';
-import { BaseQueryDto } from '../../common/dto/base-query.dto';
 import { CurrentUser } from '../auth/types/current-user';
+import { GetMessagesDto } from './dto/get-message.dto';
 
 @Controller('conversations')
 export class ChatController {
@@ -30,12 +30,8 @@ export class ChatController {
     return this.chatService.getUserConversations(req.user.id);
   }
 
-  @Get(':id/messages')
-  getMessages(
-    @Param('id') conversationId: string,
-    @Req() req: { user: CurrentUser },
-    @Query() dto: BaseQueryDto,
-  ) {
-    return this.chatService.getMessages(conversationId, req.user.id, dto);
+  @Get('messages')
+  getMessages(@Req() req: { user: CurrentUser }, @Query() dto: GetMessagesDto) {
+    return this.chatService.getMessages(req.user.id, dto);
   }
 }
