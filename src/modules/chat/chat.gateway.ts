@@ -80,9 +80,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {
     const senderId = socket.data.userId;
 
-    const message = await this.chatService.createMessage(dto, senderId);
+    const message = await this.chatService.createMessageIdempotent(
+      dto,
+      senderId,
+    );
 
-    this.server.to(dto.conversationId).emit('new_message', message);
+    socket.to(dto.conversationId).emit('new_message', message);
 
     return message;
   }

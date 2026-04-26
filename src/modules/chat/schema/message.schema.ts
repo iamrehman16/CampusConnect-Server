@@ -30,6 +30,9 @@ export class Message {
 
   createdAt: Date;
   updatedAt: Date;
+
+  @Prop({ type: String, required: true, unique: true })
+  clientId: string;
 }
 
 export const MessageSchema = SchemaFactory.createForClass(Message);

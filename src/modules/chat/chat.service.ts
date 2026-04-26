@@ -25,6 +25,10 @@ export class ChatService {
     private readonly paginationService: PaginationService,
   ) {}
 
+  async getMessageByClientId(clientId: string) {
+    return this.messageModel.findOne({ clientId });
+  }
+
   async findOrCreateConversation(
     currentUserId: string,
     dto: StartConversationDto,
@@ -97,21 +101,31 @@ export class ChatService {
     }
   }
 
-  async createMessage(dto: CreateMessageDto, senderId: string) {
+  async createMessageIdempotent(dto: CreateMessageDto, senderId: string) {
     await this.verifyParticipant(dto.conversationId, senderId);
 
-    const message = await this.messageModel.create({
-      conversationId: new Types.ObjectId(dto.conversationId),
-      sender: new Types.ObjectId(senderId),
-      content: dto.content,
-    });
+    try {
+      const message = await this.messageModel.create({
+        conversationId: new Types.ObjectId(dto.conversationId),
+        sender: new Types.ObjectId(senderId),
+        content: dto.content,
+        clientId: dto.clientId,
+      });
 
-    await this.conversationModel.findByIdAndUpdate(dto.conversationId, {
-      lastMessage: message._id,
-      lastMessageAt: message.createdAt,
-    });
+      await this.conversationModel.findByIdAndUpdate(dto.conversationId, {
+        lastMessage: message._id,
+        lastMessageAt: message.createdAt,
+      });
 
-    return message;
+      return message;
+    } catch (err) {
+      if (this.isDuplicateClientIdError(err)) {
+        // fetch the already-created message
+        return await this.messageModel.findOne({ clientId: dto.clientId });
+      }
+
+      throw err;
+    }
   }
 
   async markSeen(conversationId: string, userId: string) {
@@ -121,10 +135,9 @@ export class ChatService {
       {
         conversationId: new Types.ObjectId(conversationId),
         sender: { $ne: new Types.ObjectId(userId) },
-        seen: false,
+        seenAt: null,
       },
       {
-        seen: true,
         seenAt: new Date(),
       },
     );
@@ -179,5 +192,9 @@ export class ChatService {
     }
 
     return receiverId.toString();
+  }
+
+  private isDuplicateClientIdError(err: any): boolean {
+    return err?.code === 11000 && err?.keyPattern?.clientId;
   }
 }
