@@ -33,11 +33,15 @@ export class ChatService {
     currentUserId: string,
     dto: StartConversationDto,
   ) {
+
+    
     const currentId = new Types.ObjectId(currentUserId);
     const participantId = new Types.ObjectId(dto.participantId);
 
+    const sorted = [currentId, participantId].sort();
+
     const existing = await this.conversationModel
-      .findOne({ participants: { $all: [currentId, participantId] } })
+      .findOne({ participants: { $all: sorted } })
       .populate('participants', 'name email')
       .populate('lastMessage')
       .lean()
@@ -48,7 +52,7 @@ export class ChatService {
     }
 
     const newConversation = await this.conversationModel.create({
-      participants: [currentId, participantId],
+      participants: sorted
     });
 
     return this.conversationModel
@@ -117,11 +121,11 @@ export class ChatService {
         lastMessageAt: message.createdAt,
       });
 
-      return message;
+      return message.toObject();
     } catch (err) {
       if (this.isDuplicateClientIdError(err)) {
         // fetch the already-created message
-        return await this.messageModel.findOne({ clientId: dto.clientId });
+        return await this.messageModel.findOne({ clientId: dto.clientId }).lean().exec();
       }
 
       throw err;
