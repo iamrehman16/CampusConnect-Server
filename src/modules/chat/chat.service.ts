@@ -86,7 +86,7 @@ export class ChatService {
           isDeleted: false,
         }),
       },
-      { build: () => ({ createdAt: -1 }) },
+      { build: () => ({ createdAt: 1 }) },
     );
   }
 
