@@ -1,6 +1,6 @@
 import { IsInt, IsOptional, Min, Max, IsEnum, IsString } from "class-validator";
 import { Type } from "class-transformer";
-import { BaseQueryDto } from "src/common/dto/base-query.dto";
+import { BaseQueryDto } from "../../../common/dto/base-query.dto";
 import { Roles } from "../enums/user-role.enum";
 import { UserStatus } from "../enums/user-status.enum";
 

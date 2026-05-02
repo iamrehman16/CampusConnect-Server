@@ -1,4 +1,4 @@
-import { Roles } from "src/modules/user/enums/user-role.enum"
+import { Roles } from "../../user/enums/user-role.enum"
 
 export type CurrentUser = {
     id:string,
