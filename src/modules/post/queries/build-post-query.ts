@@ -1,4 +1,4 @@
-import { IQueryBuilder } from 'src/common/interfaces/query-builder.interface';
+import { IQueryBuilder } from '../../../common/interfaces/query-builder.interface';
 import { QueryFilter, Types } from 'mongoose';
 import { PostDocument } from '../schemas/post.schema';
 import { PostQueryDto } from '../dto/post-query.dto';

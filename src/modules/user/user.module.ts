@@ -4,7 +4,7 @@ import { UserController } from './user.controller';
 import { UserAdminController } from './user-admin.controller';
 import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from './schemas/user.schema';
-import { CommonModule } from 'src/common/common.module';
+import { CommonModule } from '../../common/common.module';
 
 @Module({
   imports: [

@@ -19,7 +19,7 @@ import { UserQueryDto } from './dto/user-query.dto';
 import {
   PaginatedResult,
   PaginationService,
-} from 'src/common/services/pagination.service';
+} from '../../common/services/pagination.service';
 import { UserQueryBuilder } from './queries/build-user-query';
 import { UserSortBuilder } from './queries/build-user-sort';
 

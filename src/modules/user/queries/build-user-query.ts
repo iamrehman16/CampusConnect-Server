@@ -1,4 +1,4 @@
-import { IQueryBuilder } from 'src/common/interfaces/query-builder.interface';
+import { IQueryBuilder } from '../../../common/interfaces/query-builder.interface';
 import { UserQueryDto } from '../dto/user-query.dto';
 import { QueryFilter } from 'mongoose';
 import { UserDocument } from '../schemas/user.schema';

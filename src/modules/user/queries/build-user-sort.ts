@@ -1,4 +1,4 @@
-import { ISortBuilder } from 'src/common/interfaces/sort-builder.interface';
+import { ISortBuilder } from '../../../common/interfaces/sort-builder.interface';
 import { UserQueryBuilder } from './build-user-query';
 import { UserQueryDto } from '../dto/user-query.dto';
 
