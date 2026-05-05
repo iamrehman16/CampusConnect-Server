@@ -21,6 +21,12 @@ export class CompleteOnboardingDto {
   @IsString({ each: true })
   interests: string[];
 
+  @IsString()
+  academicInfo: string;
+
+  @IsString()
+  name: string;
+
   @IsArray()
   @IsString({ each: true })
   expertise: string[];
