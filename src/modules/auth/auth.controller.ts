@@ -1,52 +1,52 @@
-import { Controller, Post, Req, UseGuards, Body, UseInterceptors } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Patch,
+  Req,
+  UseGuards,
+  Body,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LocalAuthguard } from './guards/local-auth.guard';
 import { RefreshAuthGuard } from './guards/refresh-auth.guard';
-import { JwtAuthGuard } from './guards/jwt-auth.guards';
 import { RegisterDto } from './dto/register.dto';
+import { CompleteOnboardingDto } from '../user/dto/complete-onboarding.dto';
 import { Public } from './decorators/public.decorator';
+import { CurrentUser } from './types/current-user';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Public()
-  @Post("register")
-  async register(@Body() registerDto: RegisterDto){
+  @Post('register')
+  async register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
   }
 
   @Public()
-  @Post("test")
-  async test(@Body() body: any){
-    console.log("Test endpoint called with body:", body);
-    return { message: "Test endpoint working", body };
-  }
-
-  @Public()
-  @Post("pre-login")
-  async preLogin(@Body() body: any, @Req() req: any){
-    console.log("Pre-login endpoint called");
-    console.log("Body:", body);
-    console.log("Headers:", req.headers);
-    return { message: "Pre-login working", body, headers: req.headers };
-  }
-
-  @Public()
   @UseGuards(LocalAuthguard)
-  @Post("login")
-  async login(@Req() req){
-    return await this.authService.login(req.user.id);
+  @Post('login')
+  async login(@Req() req: { user: CurrentUser }) {
+    return this.authService.login(req.user.id);
   }
 
   @UseGuards(RefreshAuthGuard)
-  @Post("refresh")
-  async refreshToken(@Req() req){
+  @Post('refresh')
+  async refreshToken(@Req() req: { user: CurrentUser }) {
     return this.authService.refreshToken(req.user.id);
   }
 
-  @Post("signout")
-  async signout(@Req() req){
+  @Post('signout')
+  async signout(@Req() req: { user: CurrentUser }) {
     this.authService.signout(req.user.id);
+  }
+
+  @Patch('onboarding')
+  async completeOnboarding(
+    @Req() req: { user: CurrentUser },
+    @Body() dto: CompleteOnboardingDto,
+  ) {
+    return this.authService.completeOnboarding(req.user.id, dto);
   }
 }

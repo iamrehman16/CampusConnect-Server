@@ -28,11 +28,8 @@ export class User {
   @Prop({ default: Roles.STUDENT, type: String, enum: Roles })
   role: Roles;
 
-  @Prop()
-  academicInfo: string;
-
-  @Prop()
-  expertise: string;
+  @Prop({ required: false }) //bio
+  academicInfo?: string;
 
   @Prop({ default: 0 })
   contributionScore: number;
@@ -41,7 +38,25 @@ export class User {
   accountStatus: UserStatus;
 
   @Prop({ required: false, min: 1, max: 8 })
-  semester: number;
+  semester?: number;
+
+  @Prop({ required: false })
+  department?: string;
+
+  @Prop({ required: false, default: false })
+  isOpenToMentor?: boolean;
+
+  @Prop({ required: false })
+  avatar?: string;
+
+  @Prop({ type: [String], default: [] })
+  interests?: string[];
+
+  @Prop({ type: [String], default: [] })
+  expertise?: string[];
+
+  @Prop({ required: false, default: false })
+  isOnboarded?: boolean;
 }
 
 export type UserDocument = HydratedDocument<User>;

@@ -22,6 +22,7 @@ import {
 } from '../../common/services/pagination.service';
 import { UserQueryBuilder } from './queries/build-user-query';
 import { UserSortBuilder } from './queries/build-user-sort';
+import { CompleteOnboardingDto } from './dto/complete-onboarding.dto';
 
 @Injectable()
 export class UserService {
@@ -202,5 +203,17 @@ export class UserService {
     ]);
 
     return { dailyRegistrations: rows };
+  }
+
+  async completeOnboarding(userId: string, dto: CompleteOnboardingDto) {
+    const updatedUser = await this.userModel
+      .findByIdAndUpdate(userId, { ...dto, isOnboarded: true }, { new: true })
+      .exec();
+
+    if (!updatedUser) {
+      throw new NotFoundException(`User with id ${userId} not found`);
+    }
+
+    return updatedUser.toObject();
   }
 }
