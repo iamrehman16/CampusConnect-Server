@@ -6,9 +6,8 @@ import { Role } from '../auth/decorators/role.decorator';
 import { Roles } from '../user/enums/user-role.enum';
 
 @Controller('admin/dashboard')
-@UseGuards(JwtAuthGuard, RolesGuard)
 @Role(Roles.ADMIN)
-export class DashboardController {
+export class AdminDashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
   @Get('stats')

@@ -471,4 +471,8 @@ export class ResourceService {
       topContributors: result.topContributors,
     };
   }
+
+  async getTotalResourceCount() {
+    return await this.resourceModel.countDocuments();
+  }
 }

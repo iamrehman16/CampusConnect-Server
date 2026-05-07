@@ -2,7 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { UserService } from '../user/user.service';
 import { ResourceService } from '../resource/resource.service';
 import { PostService } from '../post/post.service';
-import { ResourceAnalyticsDto, UserGrowthDto } from './dto/resource-analytics.dto';
+import {
+  ResourceAnalyticsDto,
+  UserGrowthDto,
+} from './dto/resource-analytics.dto';
+import { PublicStatsDto } from './dto/public-stats.dto';
 
 @Injectable()
 export class DashboardService {
@@ -27,12 +31,26 @@ export class DashboardService {
     };
   }
 
-  async getResourceAnalytics():Promise<ResourceAnalyticsDto>{
+  async getResourceAnalytics(): Promise<ResourceAnalyticsDto> {
     return this.resourceService.getAnalytics();
   }
 
-  async getUserGrowth():Promise<UserGrowthDto>{
+  async getUserGrowth(): Promise<UserGrowthDto> {
     return this.userService.getGrowth();
   }
 
+  async getPublicStats(): Promise<PublicStatsDto> {
+    const [userInfo, totalResources, postsThisMonth] = await Promise.all([
+      this.userService.getTotalUsersAndMentors(),
+      this.resourceService.getTotalResourceCount(),
+      this.postService.countPostsDaysAgo(30),
+    ]);
+
+    return {
+      totalUsers: userInfo.totalUsers,
+      availableMentors: userInfo.totalContributors,
+      totalResources,
+      postsThisMonth,
+    };
+  }
 }

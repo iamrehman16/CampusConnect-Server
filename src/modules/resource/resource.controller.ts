@@ -6,8 +6,6 @@ import {
   Patch,
   Param,
   Delete,
-  UseInterceptors,
-  UploadedFile,
   Res,
   Req,
   Query,
@@ -67,6 +65,7 @@ export class ResourceController {
     return this.resourceService.findAll(query);
   }
 
+  @Role(Roles.ADMIN,Roles.CONTRIBUTOR,Roles.STUDENT)
   @Get('user/:id')
   getResourcesByUser(
     @Query() query: ResourceQueryDto,

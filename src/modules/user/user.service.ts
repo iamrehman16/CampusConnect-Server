@@ -216,4 +216,13 @@ export class UserService {
 
     return updatedUser.toObject();
   }
+
+  async getTotalUsersAndMentors() {
+    const [totalUsers, totalContributors] = await Promise.all([
+      this.userModel.countDocuments(),
+      this.userModel.countDocuments({ role: Roles.CONTRIBUTOR }),
+    ]);
+
+    return { totalUsers, totalContributors };
+  }
 }

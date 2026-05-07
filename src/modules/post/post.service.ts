@@ -380,4 +380,11 @@ export class PostService {
       session.endSession();
     }
   }
+
+  async countPostsDaysAgo(days: number) {
+    const daysAgo = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    daysAgo.setHours(0, 0, 0, 0);
+
+    return this.postModel.countDocuments({ createdAt: { $gte: daysAgo } });
+  }
 }
