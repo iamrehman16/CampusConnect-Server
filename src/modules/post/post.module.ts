@@ -17,6 +17,6 @@ import { CommonModule } from '../../common/common.module';
   ],
   controllers: [PostController, PostAdminController],
   providers: [PostService],
-  exports: [PostService],
+  exports: [PostService,MongooseModule],
 })
 export class PostModule {}

@@ -1,4 +1,4 @@
-import { Injectable, Post } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { UserService } from '../user/user.service';
 import { ResourceService } from '../resource/resource.service';
 import { PostService } from '../post/post.service';
@@ -10,7 +10,7 @@ import { PublicStatsDto } from './dto/public-stats.dto';
 import { MyStatsDto } from './dto/my-stats.dto';
 import { Model, Types } from 'mongoose';
 import { ApprovalStatus } from '../resource/enums/approval-status.enum';
-import { PostDocument } from '../post/schemas/post.schema';
+import { Post, PostDocument } from '../post/schemas/post.schema';
 import { InjectModel } from '@nestjs/mongoose';
 import {
   Resource,

@@ -20,6 +20,6 @@ import { QueuesModule } from '../queues/queues.module';
   ],
   controllers: [ResourceController, ResourceAdminController],
   providers: [ResourceService],
-  exports: [ResourceService],
+  exports: [ResourceService, MongooseModule],
 })
 export class ResourceModule {}
