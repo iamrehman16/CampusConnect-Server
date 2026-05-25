@@ -74,4 +74,14 @@ export class GroqService {
     });
     return completion.choices[0]?.message?.content || '';
   }
+
+  generateStream(
+    messages: Groq.Chat.ChatCompletionMessageParam[],
+  ): Promise<AsyncIterable<Groq.Chat.ChatCompletionChunk>> {
+    return this.groq.chat.completions.create({
+      messages,
+      model: this.aiCfg.models.reasoning,
+      stream: true,
+    });
+  }
 }
